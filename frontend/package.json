@@ -8,19 +8,28 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "mobile:ios": "CAP_DEV_URL=http://localhost:5173 cap run ios",
+    "mobile:android": "adb reverse tcp:5173 tcp:5173 && CAP_DEV_URL=http://localhost:5173 cap run android",
+    "mobile:open:ios": "CAP_DEV_URL=http://localhost:5173 cap sync ios && cap open ios",
+    "mobile:open:android": "CAP_DEV_URL=http://localhost:5173 cap sync android && cap open android"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.4",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
     "antd": "^6.6.5",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "oxlint": "^1.81.0",
+    "typescript": "^7.0.2",
     "vite": "^8.3.0"
   }
 }

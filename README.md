@@ -76,6 +76,26 @@ from your web server.
 
 Check the frontend with `yarn lint` and `yarn build`. Run the backend tests with `python manage.py test` (needs the `CREATEDB` permission above).
 
+### 4. Mobile app (local testing, Capacitor)
+
+The same React app runs as an Android and iOS app with [Capacitor](https://capacitorjs.com)
+(`frontend/android`, `frontend/ios`, `frontend/capacitor.config.ts`, app ID `com.yeticode.portal`).
+For local testing the app opens the running dev site, so keep the backend (`runserver`) and
+`yarn dev` running, then:
+
+```bash
+cd frontend
+yarn mobile:ios        # iPhone simulator (needs Xcode + an iOS simulator runtime)
+yarn mobile:android    # Android emulator or USB phone (needs Android Studio / the Android SDK)
+```
+
+`yarn mobile:open:ios` / `yarn mobile:open:android` open the project in Xcode / Android Studio instead.
+The app still counts as `localhost` (Android via `adb reverse`), so login, chat, voice messages and
+audio calls work, including the microphone. Code changes reload live. Chat, calls and notifications
+work while the app is open; ringing in the background needs push notifications, which aren't set up.
+For a real release the backend must be online with HTTPS, and you'd build with `yarn build && npx cap sync`
+(no `CAP_DEV_URL`).
+
 ## How access works
 
 | Concept | Where it lives |
