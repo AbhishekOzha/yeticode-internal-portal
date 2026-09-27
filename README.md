@@ -4,29 +4,48 @@ Role-based access for Yeticode's three units. There is no public sign-up:
 a Super Admin creates every account in the Django admin and gives it one role,
 and the role decides the person's unit, permissions and dashboard.
 
-- `backend/` — Django 5.1, Django REST Framework, PostgreSQL
+- `backend/` — Django 5.2 LTS, Django REST Framework, PostgreSQL
 - `frontend/` — React 19 + Vite
 
 ## Running it locally
 
-```bash
-docker compose up -d db                 # or use any PostgreSQL 16 with the same credentials
+### 1. Database
 
+The backend expects a PostgreSQL role and database both named `yeticode`
+(password `yeticode`). Pick one option.
+
+**Homebrew PostgreSQL on macOS** (`brew install postgresql@16 && brew services start postgresql@16`):
+
+```bash
+psql postgres -c "CREATE ROLE yeticode WITH LOGIN PASSWORD 'yeticode' CREATEDB;"
+createdb -O yeticode yeticode
+```
+
+**Docker**: `docker compose up -d db` creates both for you. Stop any other
+PostgreSQL on port 5432 first, or the two will clash.
+
+### 2. Backend
+
+```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-export DJANGO_DEBUG=1                   # see ../.env.example for all settings
+cp .env.example .env                    # local settings, loaded automatically; git ignores .env
 python manage.py migrate                # also creates the units, roles and default permissions
 python manage.py createsuperuser        # your first Super Admin
 python manage.py create_demo_users      # optional, dev only: one account per role
-python manage.py runserver
+python manage.py runserver              # http://localhost:8000/admin/
+```
 
-cd ../frontend
+### 3. Frontend
+
+```bash
+cd frontend
 npm install
 npm run dev                             # http://localhost:5173 (proxies /api and /admin to :8000)
 ```
 
-Run the backend tests with `DJANGO_DEBUG=1 python manage.py test accounts`.
+Run the backend tests with `python manage.py test accounts` (needs the `CREATEDB` permission above).
 
 ## How access works
 

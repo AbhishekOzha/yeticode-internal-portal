@@ -6,6 +6,21 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def load_env_file(path):
+    """Load KEY=VALUE lines from a .env file. Real environment variables win."""
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+
+
+load_env_file(BASE_DIR / ".env")
+
+
 def env_bool(name, default=False):
     return os.environ.get(name, str(default)).lower() in {"1", "true", "yes", "on"}
 
@@ -19,7 +34,10 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or (
     "dev-only-insecure-key" if DEBUG else None
 )
 if not SECRET_KEY:
-    raise RuntimeError("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is off.")
+    raise RuntimeError(
+        "DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is off. "
+        "For local development, copy backend/.env.example to backend/.env."
+    )
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
