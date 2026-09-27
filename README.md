@@ -56,8 +56,8 @@ production the command refuses to run without them.
 
 ```bash
 cd frontend
-npm install
-npm run dev                             # http://localhost:5173 (proxies /api, /admin and /media to :8000)
+yarn install                            # the project uses Yarn 1 (yarn.lock); `npm i -g yarn` if you don't have it
+yarn dev                                # http://localhost:5173 (proxies /api, /admin and /media to :8000)
 ```
 
 ### Uploads
@@ -68,7 +68,7 @@ WebP and at most 2 MB; SVG is refused because it can carry scripts. Django
 serves `/media/` only while `DEBUG` is on, so in production serve `MEDIA_ROOT`
 from your web server.
 
-Run the backend tests with `python manage.py test` (needs the `CREATEDB` permission above).
+Check the frontend with `yarn lint` and `yarn build`. Run the backend tests with `python manage.py test` (needs the `CREATEDB` permission above).
 
 ## How access works
 

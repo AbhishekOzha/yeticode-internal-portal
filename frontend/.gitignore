@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# The project uses Yarn (yarn.lock); keep npm and pnpm lock files out.
+package-lock.json
+pnpm-lock.yaml
