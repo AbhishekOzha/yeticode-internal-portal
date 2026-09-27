@@ -3,7 +3,7 @@ import { App, Avatar } from 'antd'
 import { teamApi } from '../api'
 import { desktopNotify } from '../notify'
 import { colorFor, displayName, initials } from '../people'
-import { ChatContext, conversationOf, inTeam } from '../team'
+import { ChatContext, conversationOf, inTeam, messageText } from '../team'
 
 const POLL_MS = 4000
 
@@ -42,7 +42,7 @@ export function ChatProvider({ user, children }) {
       notification.open({
         key: `chat-${conversation}`,
         title,
-        description: message.body.length > 140 ? `${message.body.slice(0, 140)}…` : message.body,
+        description: messageText(message).length > 140 ? `${messageText(message).slice(0, 140)}…` : messageText(message),
         icon: (
           <Avatar src={sender.avatar || undefined} style={{ background: sender.avatar ? undefined : colorFor(displayName(sender)) }}>
             {initials(displayName(sender))}
@@ -56,7 +56,7 @@ export function ChatProvider({ user, children }) {
         style: { cursor: 'pointer' },
       })
       if (document.visibilityState !== 'visible') {
-        desktopNotify(title, { body: message.body, icon: sender.avatar, tag: `chat-${conversation}`, onClick: open })
+        desktopNotify(title, { body: messageText(message), icon: sender.avatar, tag: `chat-${conversation}`, onClick: open })
       }
     }
   }, [notification, user.id])

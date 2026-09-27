@@ -92,6 +92,13 @@ export const teamApi = {
     return request(`/chat/messages/?${params}`)
   },
   sendChat: (to, body) => request('/chat/messages/', { method: 'POST', body: { to: to === 'team' ? null : Number(to), body } }),
+  sendVoice: (to, blob, duration, extension) => {
+    const data = new FormData()
+    if (to !== 'team') data.append('to', to)
+    data.append('audio', blob, `voice.${extension}`)
+    data.append('duration', String(Math.round(duration)))
+    return request('/chat/messages/', { method: 'POST', body: data })
+  },
   markChatRead: (withId, lastId) => request('/chat/read/', { method: 'POST', body: { with: withId, last_id: lastId } }),
   reviewPeople: (month) => request(`/team/reviews/people/?month=${month}`),
   writeReview: (data) => request('/team/reviews/', { method: 'POST', body: data }),

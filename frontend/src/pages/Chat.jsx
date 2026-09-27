@@ -4,8 +4,9 @@ import { App, Avatar, Badge, Button, Card, Empty, Flex, Grid, Input, Skeleton, T
 import { teamApi } from '../api'
 import { NotificationSwitch } from '../components/NotificationSwitch'
 import { PersonAvatar } from '../components/People'
+import { VoiceRecorder } from '../components/VoiceRecorder'
 import { displayName } from '../people'
-import { useChat } from '../team'
+import { messageText, useChat } from '../team'
 
 const POLL_MS = 3000
 const GROUP_GAP_MS = 5 * 60 * 1000
@@ -25,7 +26,7 @@ function dayOf(iso) {
 
 function preview(message, meId) {
   if (!message) return 'No messages yet'
-  return `${message.sender === meId ? 'You: ' : ''}${message.body}`
+  return `${message.sender === meId ? 'You: ' : ''}${messageText(message)}`
 }
 
 function TeamAvatar({ size = 40 }) {
@@ -58,6 +59,7 @@ function Conversation({ me, peer, people, onBack, onSent }) {
   const [messages, setMessages] = useState(null)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  const [recording, setRecording] = useState(false)
   const listRef = useRef(null)
   const lastId = messages?.length ? messages[messages.length - 1].id : 0
   const lastIdRef = useRef(0)
@@ -114,6 +116,16 @@ function Conversation({ me, peer, people, onBack, onSent }) {
     document.addEventListener('visibilitychange', markRead)
     return () => document.removeEventListener('visibilitychange', markRead)
   }, [lastId, withId, setUnread])
+
+  async function sendVoice(blob, duration, extension) {
+    try {
+      const sent = await teamApi.sendVoice(withId, blob, duration, extension)
+      setMessages((current) => ((current ?? []).some((m) => m.id === sent.id) ? current : [...(current ?? []), sent]))
+      onSent()
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
 
   async function send() {
     const body = draft.trim()
@@ -179,7 +191,11 @@ function Conversation({ me, peer, people, onBack, onSent }) {
                         {sender ? displayName(sender) : 'Former teammate'}
                       </Typography.Text>
                     )}
-                    <div className={`chat-bubble ${mine ? 'mine' : ''}`} title={new Date(m.created_at).toLocaleString()}>
+                    <div
+                      className={`chat-bubble ${mine ? 'mine' : ''} ${m.audio ? 'voice' : ''}`}
+                      title={new Date(m.created_at).toLocaleString()}
+                    >
+                      {m.audio && <audio controls preload="metadata" src={m.audio} aria-label="Voice message" />}
                       {m.body}
                       <span className="chat-time">{timeOf(m.created_at)}</span>
                     </div>
@@ -191,21 +207,29 @@ function Conversation({ me, peer, people, onBack, onSent }) {
         )}
       </div>
       <Flex gap={8} align="flex-end" className="chat-composer">
-        <Input.TextArea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onPressEnter={(e) => {
-            if (!e.shiftKey) {
-              e.preventDefault()
-              send()
-            }
-          }}
-          placeholder={`Message ${peer ? displayName(peer) : 'the team'} (Enter to send, Shift+Enter for a new line)`}
-          autoSize={{ minRows: 1, maxRows: 5 }}
-          maxLength={4000}
-          autoFocus
-        />
-        <Button type="primary" icon={<SendOutlined />} loading={sending} disabled={!draft.trim()} onClick={send} aria-label="Send" />
+        {!recording && (
+          <Input.TextArea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onPressEnter={(e) => {
+              if (!e.shiftKey) {
+                e.preventDefault()
+                send()
+              }
+            }}
+            placeholder={`Message ${peer ? displayName(peer) : 'the team'} (Enter to send, Shift+Enter for a new line)`}
+            autoSize={{ minRows: 1, maxRows: 5 }}
+            maxLength={4000}
+            autoFocus
+          />
+        )}
+        {draft.trim() && !recording ? (
+          <Button type="primary" icon={<SendOutlined />} loading={sending} onClick={send} aria-label="Send" />
+        ) : (
+          <Flex flex={recording ? 1 : undefined} justify="flex-end">
+            <VoiceRecorder onSend={sendVoice} onRecordingChange={setRecording} />
+          </Flex>
+        )}
       </Flex>
     </Flex>
   )

@@ -1,6 +1,10 @@
 """Office hours and team chat for the Academic Content Writing unit."""
 
+import os
+import uuid
+
 from django.conf import settings
+from django.core.files.storage import FileSystemStorage
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
@@ -39,6 +43,32 @@ class OfficeHours(models.Model):
         return [int(d) for d in self.work_days.split(",") if d.strip()]
 
 
+class PrivateStorage(FileSystemStorage):
+    """Files under PRIVATE_MEDIA_ROOT, which is never served directly (read on each use, so tests can change it)."""
+
+    @property
+    def base_location(self):
+        return settings.PRIVATE_MEDIA_ROOT
+
+    @property
+    def location(self):
+        return os.path.abspath(self.base_location)
+
+    @property
+    def base_url(self):
+        return None
+
+
+def private_storage():
+    """Voice messages live outside MEDIA_ROOT and are only served through the chat API."""
+    return PrivateStorage()
+
+
+def voice_upload_to(instance, filename):
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else "webm"
+    return f"chat_voice/{uuid.uuid4().hex}.{extension}"
+
+
 class ChatMessage(models.Model):
     """A message to the whole team (no recipient) or to one colleague."""
 
@@ -47,7 +77,9 @@ class ChatMessage(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name="chat_received",
         help_text="Empty for the team room.",
     )
-    body = models.TextField(max_length=4000)
+    body = models.TextField(max_length=4000, blank=True)
+    audio = models.FileField(upload_to=voice_upload_to, storage=private_storage, blank=True)
+    audio_duration = models.PositiveIntegerField(null=True, blank=True, help_text="Seconds.")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
@@ -55,7 +87,7 @@ class ChatMessage(models.Model):
         indexes = [models.Index(fields=["sender", "recipient", "id"])]
 
     def __str__(self):
-        return f"{self.sender} → {self.recipient or 'team'}: {self.body[:40]}"
+        return f"{self.sender} → {self.recipient or 'team'}: {self.body[:40] or 'voice message'}"
 
 
 class ChatRead(models.Model):

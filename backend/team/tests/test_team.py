@@ -1,10 +1,15 @@
-from django.test import TestCase
+import shutil
+import tempfile
+
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from accounts.models import Role, User
 from team.models import ChatMessage, OfficeHours
 
 PASSWORD = "Str0ng-pass-123"
+PRIVATE_ROOT = tempfile.mkdtemp()
 
 
 def role(unit, code):
@@ -278,3 +283,63 @@ class ReviewTests(TeamTestCase):
         for user in [self.writer, self.supervisor, self.sales_manager, self.dev, self.head_hr]:
             self.as_user(user)
             self.assertEqual(self.client.get("/api/team/reviews/summary/").status_code, 403, user.username)
+
+
+WEBM_HEADER = b"\x1a\x45\xdf\xa3" + b"\x00" * 60
+
+
+@override_settings(PRIVATE_MEDIA_ROOT=PRIVATE_ROOT)
+class VoiceMessageTests(TeamTestCase):
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(PRIVATE_ROOT, ignore_errors=True)
+
+    def send_voice(self, to=None, data=WEBM_HEADER, name="voice.webm", duration="7"):
+        payload = {"audio": SimpleUploadedFile(name, data, content_type="audio/webm"), "duration": duration}
+        if to:
+            payload["to"] = to.pk
+        return self.client.post("/api/chat/messages/", payload, format="multipart")
+
+    def test_send_and_play_a_direct_voice_message(self):
+        self.as_user(self.writer)
+        response = self.send_voice(to=self.production)
+        self.assertEqual(response.status_code, 201, response.json())
+        message = response.json()
+        self.assertEqual(message["audio_duration"], 7)
+        self.assertEqual(message["body"], "")
+        self.assertTrue(message["audio"].startswith("/api/chat/messages/"))
+
+        self.as_user(self.production)
+        played = self.client.get(message["audio"])
+        self.assertEqual(played.status_code, 200)
+        self.assertEqual(played["Content-Type"], "audio/webm")
+        self.assertEqual(b"".join(played.streaming_content), WEBM_HEADER)
+
+        # Nobody else in the team can play a direct voice message, and outsiders can't play any.
+        for user in [self.hr, self.sales]:
+            self.as_user(user)
+            self.assertEqual(self.client.get(message["audio"]).status_code, 404)
+        self.as_user(self.dev)
+        self.assertEqual(self.client.get(message["audio"]).status_code, 403)
+
+    def test_team_room_voice_message(self):
+        self.as_user(self.writer)
+        message = self.send_voice().json()
+        self.as_user(self.sales)
+        self.assertEqual(self.client.get(message["audio"]).status_code, 200)
+        self.assertEqual(self.client.get("/api/chat/updates/").json()["unread"]["team"], 1)
+
+    def test_only_audio_is_accepted(self):
+        self.as_user(self.writer)
+        self.assertEqual(self.send_voice(data=b"<html>not audio</html>", name="x.webm").status_code, 400)
+        big = WEBM_HEADER + b"\x00" * (5 * 1024 * 1024)
+        self.assertEqual(self.send_voice(data=big).status_code, 400)
+        self.assertEqual(ChatMessage.objects.count(), 0)
+
+    def test_voice_files_are_not_public_media(self):
+        self.as_user(self.writer)
+        self.send_voice()
+        stored = ChatMessage.objects.get().audio
+        self.assertTrue(stored.path.startswith(PRIVATE_ROOT))
+        self.assertNotIn("/media/", stored.name)

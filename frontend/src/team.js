@@ -108,3 +108,15 @@ export function conversationOf(message, meId) {
   if (message.recipient === null) return 'team'
   return String(message.sender === meId ? message.recipient : message.sender)
 }
+
+export function formatDuration(seconds) {
+  const s = Math.max(0, Math.round(seconds || 0))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+// What a message says in previews and notifications.
+export function messageText(message) {
+  if (message.body) return message.body
+  if (message.audio) return `🎤 Voice message${message.audio_duration ? ` (${formatDuration(message.audio_duration)})` : ''}`
+  return ''
+}

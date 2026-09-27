@@ -7,6 +7,8 @@ with payroll, employee records or user management in the content unit).
 """
 
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import FileResponse, Http404
 from django.contrib.auth import get_user_model
 from django.db.models import Count, F, OuterRef, Q, Subquery, Value
 from django.db.models.functions import Coalesce
@@ -20,6 +22,7 @@ from rest_framework.views import APIView
 from accounts.serializers import ImageUrlField
 
 from .models import TEAM_UNIT, WEEKDAYS, ChatMessage, ChatRead, OfficeHours
+from .voice import FORMATS, MAX_VOICE_SECONDS, check_voice
 
 User = get_user_model()
 MANAGER_CAPABILITIES = ["manage_payroll", "manage_employee_records", "manage_unit_users"]
@@ -182,6 +185,9 @@ def message_data(message):
         "sender": message.sender_id,
         "recipient": message.recipient_id,
         "body": message.body,
+        # Voice messages are fetched through the API, which checks you're in the conversation.
+        "audio": f"/api/chat/messages/{message.pk}/audio/" if message.audio else None,
+        "audio_duration": message.audio_duration,
         "created_at": message.created_at.isoformat(),
     }
 
@@ -259,14 +265,48 @@ class ChatMessagesView(APIView):
         me = request.user
         peer = resolve_peer(me, request.data.get("to"))
         body = str(request.data.get("body", "")).strip()
-        if not body:
-            raise ValidationError({"body": "Write a message first."})
+        audio = request.FILES.get("audio")
+        if not body and not audio:
+            raise ValidationError({"body": "Write a message or record a voice message first."})
         if len(body) > 4000:
             raise ValidationError({"body": "Messages can be at most 4,000 characters."})
-        message = ChatMessage.objects.create(sender=me, recipient=peer, body=body)
+        duration = None
+        if audio:
+            try:
+                kind = check_voice(audio)
+            except DjangoValidationError as exc:
+                raise ValidationError({"audio": exc.messages})
+            try:
+                duration = max(0, min(int(float(request.data.get("duration") or 0)), MAX_VOICE_SECONDS))
+            except ValueError:
+                duration = None
+            audio.name = f"voice.{kind}"
+        message = ChatMessage.objects.create(
+            sender=me, recipient=peer, body=body, audio=audio or "", audio_duration=duration
+        )
         # Your own message counts as read.
         ChatRead.objects.update_or_create(user=me, peer=peer, defaults={"last_read_id": message.pk})
         return Response(message_data(message), status=status.HTTP_201_CREATED)
+
+
+class ChatAudioView(APIView):
+    """Plays a voice message, only for people who can see its conversation."""
+
+    permission_classes = [IsTeamMember]
+
+    def get(self, request, pk):
+        me = request.user
+        message = (
+            ChatMessage.objects.filter(pk=pk)
+            .filter(Q(recipient__isnull=True) | Q(recipient=me) | Q(sender=me))
+            .first()
+        )
+        if message is None or not message.audio:
+            raise Http404
+        extension = message.audio.name.rsplit(".", 1)[-1]
+        response = FileResponse(message.audio.open("rb"), content_type=FORMATS.get(extension, "application/octet-stream"))
+        response["Cache-Control"] = "private, max-age=86400"
+        return response
 
 
 class ChatReadView(APIView):

@@ -120,6 +120,8 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # DEBUG is on; in production, serve MEDIA_ROOT from the web server.
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
+# Private uploads (chat voice messages). Never served directly; the API checks access first.
+PRIVATE_MEDIA_ROOT = Path(os.environ.get("PRIVATE_MEDIA_ROOT", BASE_DIR / "private_media"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

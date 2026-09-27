@@ -167,3 +167,8 @@ html[data-theme='dark'] .chat-composer { border-color: rgba(255, 255, 255, 0.08)
   .chat-card { height: calc(100vh - 200px); }
   .chat-messages { padding: 8px 12px 12px; }
 }
+.voice-recording { padding: 0 4px; }
+.rec-dot { width: 10px; height: 10px; border-radius: 50%; background: #e03131; animation: rec-pulse 1s ease-in-out infinite; }
+@keyframes rec-pulse { 50% { opacity: 0.3; } }
+.chat-bubble audio { display: block; width: 260px; max-width: 100%; height: 40px; }
+.chat-bubble.voice { padding: 6px 8px; }
