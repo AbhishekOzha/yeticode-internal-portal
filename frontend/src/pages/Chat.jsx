@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftOutlined, SearchOutlined, SendOutlined, TeamOutlined } from '@ant-design/icons'
-import { App, Avatar, Badge, Button, Card, Empty, Flex, Grid, Input, Skeleton, Typography } from 'antd'
+import { ArrowLeftOutlined, PaperClipOutlined, SearchOutlined, SendOutlined, TeamOutlined } from '@ant-design/icons'
+import { App, Avatar, Badge, Button, Card, Empty, Flex, Grid, Input, Skeleton, Tooltip, Typography, Upload } from 'antd'
 import { teamApi } from '../api'
 import { NotificationSwitch } from '../components/NotificationSwitch'
+import { ChatAttachment } from '../components/ChatAttachment'
 import { PersonAvatar } from '../components/People'
 import { VoiceRecorder } from '../components/VoiceRecorder'
 import { displayName } from '../people'
-import { messageText, useChat } from '../team'
+import { CHAT_FILE_ACCEPT, MAX_CHAT_FILE_BYTES, messageText, useChat } from '../team'
 
 const POLL_MS = 3000
 const GROUP_GAP_MS = 5 * 60 * 1000
@@ -60,6 +61,7 @@ function Conversation({ me, peer, people, onBack, onSent }) {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [recording, setRecording] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const listRef = useRef(null)
   const lastId = messages?.length ? messages[messages.length - 1].id : 0
   const lastIdRef = useRef(0)
@@ -117,11 +119,33 @@ function Conversation({ me, peer, people, onBack, onSent }) {
     return () => document.removeEventListener('visibilitychange', markRead)
   }, [lastId, withId, setUnread])
 
+  function addSent(sent) {
+    setMessages((current) => ((current ?? []).some((m) => m.id === sent.id) ? current : [...(current ?? []), sent]))
+    onSent()
+  }
+
+  // Sends the picked file right away, with anything typed in the box as its caption.
+  function sendFile(file) {
+    if (file.size > MAX_CHAT_FILE_BYTES) {
+      toast.error('Files can be at most 20 MB.')
+      return Upload.LIST_IGNORE
+    }
+    const caption = draft.trim()
+    setUploading(true)
+    teamApi
+      .sendFile(withId, file, caption)
+      .then((sent) => {
+        addSent(sent)
+        if (caption) setDraft('')
+      })
+      .catch((err) => toast.error(err.message))
+      .finally(() => setUploading(false))
+    return Upload.LIST_IGNORE
+  }
+
   async function sendVoice(blob, duration, extension) {
     try {
-      const sent = await teamApi.sendVoice(withId, blob, duration, extension)
-      setMessages((current) => ((current ?? []).some((m) => m.id === sent.id) ? current : [...(current ?? []), sent]))
-      onSent()
+      addSent(await teamApi.sendVoice(withId, blob, duration, extension))
     } catch (err) {
       toast.error(err.message)
     }
@@ -185,7 +209,7 @@ function Conversation({ me, peer, people, onBack, onSent }) {
                       {!grouped && sender && <PersonAvatar person={sender} size={32} />}
                     </div>
                   )}
-                  <div style={{ maxWidth: '72%' }}>
+                  <div style={{ maxWidth: '72%', minWidth: 0 }}>
                     {!mine && !grouped && !peer && (
                       <Typography.Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
                         {sender ? displayName(sender) : 'Former teammate'}
@@ -196,6 +220,7 @@ function Conversation({ me, peer, people, onBack, onSent }) {
                       title={new Date(m.created_at).toLocaleString()}
                     >
                       {m.audio && <audio controls preload="metadata" src={m.audio} aria-label="Voice message" />}
+                      {m.file && <ChatAttachment file={m.file} mine={mine} />}
                       {m.body}
                       <span className="chat-time">{timeOf(m.created_at)}</span>
                     </div>
@@ -207,6 +232,13 @@ function Conversation({ me, peer, people, onBack, onSent }) {
         )}
       </div>
       <Flex gap={8} align="flex-end" className="chat-composer">
+        {!recording && (
+          <Upload accept={CHAT_FILE_ACCEPT} showUploadList={false} beforeUpload={sendFile} disabled={uploading}>
+            <Tooltip title="Attach a file (Word, Excel, PowerPoint, PDF, CSV, images, ZIP · up to 20 MB)">
+              <Button icon={<PaperClipOutlined />} loading={uploading} aria-label="Attach a file" />
+            </Tooltip>
+          </Upload>
+        )}
         {!recording && (
           <Input.TextArea
             value={draft}
@@ -227,7 +259,7 @@ function Conversation({ me, peer, people, onBack, onSent }) {
           <Button type="primary" icon={<SendOutlined />} loading={sending} onClick={send} aria-label="Send" />
         ) : (
           <Flex flex={recording ? 1 : undefined} justify="flex-end">
-            <VoiceRecorder onSend={sendVoice} onRecordingChange={setRecording} />
+            <VoiceRecorder onSend={sendVoice} onRecordingChange={setRecording} targetName={title} />
           </Flex>
         )}
       </Flex>

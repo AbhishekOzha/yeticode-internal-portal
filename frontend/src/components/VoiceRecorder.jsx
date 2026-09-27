@@ -18,7 +18,7 @@ function voiceSupported() {
 
 // A mic button that records a voice message; while recording it shows a timer,
 // a discard button and a send button. Recordings stop at 5 minutes.
-export function VoiceRecorder({ onSend, disabled, onRecordingChange }) {
+export function VoiceRecorder({ onSend, disabled, onRecordingChange, targetName }) {
   const { message } = App.useApp()
   const [recording, setRecording] = useState(false)
   const [seconds, setSeconds] = useState(0)
@@ -28,16 +28,21 @@ export function VoiceRecorder({ onSend, disabled, onRecordingChange }) {
   const started = useRef(0)
   const keep = useRef(false)
   const format = useRef(TYPES[0])
+  const mounted = useRef(false)
 
   function stopTracks() {
     recorder.current?.stream.getTracks().forEach((t) => t.stop())
   }
 
   // Release the microphone if the conversation closes mid-recording.
-  useEffect(() => () => {
-    keep.current = false
-    if (recorder.current?.state === 'recording') recorder.current.stop()
-    stopTracks()
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      keep.current = false
+      if (recorder.current?.state === 'recording') recorder.current.stop()
+      stopTracks()
+    }
   }, [])
 
   useEffect(() => {
@@ -63,6 +68,11 @@ export function VoiceRecorder({ onSend, disabled, onRecordingChange }) {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch {
       message.error('Allow microphone access in your browser to record a voice message.')
+      return
+    }
+    if (!mounted.current) {
+      // The chat changed while the browser was asking for the microphone: don't record into the old one.
+      stream.getTracks().forEach((t) => t.stop())
       return
     }
     format.current = TYPES.find(([type]) => MediaRecorder.isTypeSupported(type)) ?? ['', 'webm']
@@ -114,6 +124,11 @@ export function VoiceRecorder({ onSend, disabled, onRecordingChange }) {
       <Typography.Text strong style={{ fontVariantNumeric: 'tabular-nums' }}>
         {formatDuration(seconds)}
       </Typography.Text>
+      {targetName && (
+        <Typography.Text type="secondary" ellipsis style={{ flex: 1, minWidth: 0 }}>
+          Recording to {targetName}
+        </Typography.Text>
+      )}
       <Tooltip title="Discard">
         <Button type="text" danger icon={<DeleteOutlined />} onClick={() => finish(false)} aria-label="Discard recording" />
       </Tooltip>

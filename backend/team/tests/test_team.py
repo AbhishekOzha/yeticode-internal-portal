@@ -343,3 +343,90 @@ class VoiceMessageTests(TeamTestCase):
         stored = ChatMessage.objects.get().audio
         self.assertTrue(stored.path.startswith(PRIVATE_ROOT))
         self.assertNotIn("/media/", stored.name)
+
+
+def png_bytes():
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), "#3451d1").save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+@override_settings(PRIVATE_MEDIA_ROOT=PRIVATE_ROOT)
+class ChatFileTests(TeamTestCase):
+    def send_file(self, name, data, to=None, body=""):
+        payload = {"file": SimpleUploadedFile(name, data), "body": body}
+        if to:
+            payload["to"] = to.pk
+        return self.client.post("/api/chat/messages/", payload, format="multipart")
+
+    def test_share_documents_in_a_direct_chat(self):
+        self.as_user(self.writer)
+        files = {
+            "Brief.docx": b"PK\x03\x04" + b"\x00" * 40,
+            "Slides.pptx": b"PK\x03\x04" + b"\x00" * 40,
+            "Budget.xlsx": b"PK\x03\x04" + b"\x00" * 40,
+            "Old.doc": b"\xd0\xcf\x11\xe0" + b"\x00" * 40,
+            "Report.pdf": b"%PDF-1.7\n" + b"\x00" * 40,
+            "orders.csv": b"order,words\n4512,3000\n",
+            "notes.txt": b"hello",
+            "archive.zip": b"PK\x03\x04" + b"\x00" * 40,
+        }
+        for name, data in files.items():
+            response = self.send_file(name, data, to=self.production, body="See attached")
+            self.assertEqual(response.status_code, 201, (name, response.json()))
+            self.assertEqual(response.json()["file"]["name"], name)
+            self.assertFalse(response.json()["file"]["is_image"])
+
+        self.as_user(self.production)
+        last = ChatMessage.objects.filter(attachment_name="Report.pdf").get()
+        download = self.client.get(f"/api/chat/messages/{last.pk}/file/")
+        self.assertEqual(download.status_code, 200)
+        self.assertIn('attachment; filename="Report.pdf"', download["Content-Disposition"])
+        self.assertEqual(download["Content-Type"], "application/pdf")
+
+        # Not for anyone else.
+        self.as_user(self.hr)
+        self.assertEqual(self.client.get(f"/api/chat/messages/{last.pk}/file/").status_code, 404)
+        self.as_user(self.dev)
+        self.assertEqual(self.client.get(f"/api/chat/messages/{last.pk}/file/").status_code, 403)
+
+    def test_images_show_inline(self):
+        self.as_user(self.writer)
+        message = self.send_file("photo.png", png_bytes()).json()
+        self.assertTrue(message["file"]["is_image"])
+        self.as_user(self.sales)
+        response = self.client.get(message["file"]["url"])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertNotIn("attachment", response.get("Content-Disposition", ""))
+        forced = self.client.get(message["file"]["url"] + "?download=1")
+        self.assertIn("attachment", forced["Content-Disposition"])
+
+    def test_unsafe_or_fake_files_are_refused(self):
+        self.as_user(self.writer)
+        for name, data in [
+            ("page.html", b"<script>alert(1)</script>"),
+            ("logo.svg", b"<svg onload='alert(1)'/>"),
+            ("setup.exe", b"MZ\x90\x00"),
+            ("script.js", b"alert(1)"),
+            ("fake.pdf", b"<html>not a pdf</html>"),
+            ("fake.docx", b"MZ\x90\x00 not office"),
+            ("fake.png", b"not an image"),
+            ("empty.txt", b""),
+        ]:
+            self.assertEqual(self.send_file(name, data).status_code, 400, name)
+        big = b"%PDF" + b"\x00" * (20 * 1024 * 1024)
+        self.assertEqual(self.send_file("big.pdf", big).status_code, 400)
+        self.assertEqual(ChatMessage.objects.count(), 0)
+
+    def test_file_names_are_kept_but_not_used_on_disk(self):
+        self.as_user(self.writer)
+        self.send_file("../../etc/Quarterly plan.xlsx", b"PK\x03\x04" + b"\x00" * 40)
+        message = ChatMessage.objects.get()
+        self.assertTrue(message.attachment.name.startswith("chat_files/"))
+        self.assertTrue(message.attachment.path.startswith(PRIVATE_ROOT))
+        self.assertNotIn("..", message.attachment.name)

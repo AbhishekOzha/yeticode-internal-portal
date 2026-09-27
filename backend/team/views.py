@@ -22,6 +22,7 @@ from rest_framework.views import APIView
 from accounts.serializers import ImageUrlField
 
 from .models import TEAM_UNIT, WEEKDAYS, ChatMessage, ChatRead, OfficeHours
+from .files import ALLOWED, IMAGES, check_attachment, extension_of
 from .voice import FORMATS, MAX_VOICE_SECONDS, check_voice
 
 User = get_user_model()
@@ -188,6 +189,16 @@ def message_data(message):
         # Voice messages are fetched through the API, which checks you're in the conversation.
         "audio": f"/api/chat/messages/{message.pk}/audio/" if message.audio else None,
         "audio_duration": message.audio_duration,
+        "file": (
+            {
+                "url": f"/api/chat/messages/{message.pk}/file/",
+                "name": message.attachment_name,
+                "size": message.attachment_size,
+                "is_image": extension_of(message.attachment.name) in IMAGES,
+            }
+            if message.attachment
+            else None
+        ),
         "created_at": message.created_at.isoformat(),
     }
 
@@ -266,8 +277,19 @@ class ChatMessagesView(APIView):
         peer = resolve_peer(me, request.data.get("to"))
         body = str(request.data.get("body", "")).strip()
         audio = request.FILES.get("audio")
-        if not body and not audio:
-            raise ValidationError({"body": "Write a message or record a voice message first."})
+        upload = request.FILES.get("file")
+        if not body and not audio and not upload:
+            raise ValidationError({"body": "Write a message, record a voice message or attach a file first."})
+        if audio and upload:
+            raise ValidationError({"file": "Send the voice message and the file separately."})
+        original_name = ""
+        if upload:
+            try:
+                extension = check_attachment(upload)
+            except DjangoValidationError as exc:
+                raise ValidationError({"file": exc.messages})
+            original_name = upload.name.replace("/", "_").replace("\\", "_")[:255]
+            upload.name = f"file.{extension}"
         if len(body) > 4000:
             raise ValidationError({"body": "Messages can be at most 4,000 characters."})
         duration = None
@@ -282,11 +304,25 @@ class ChatMessagesView(APIView):
                 duration = None
             audio.name = f"voice.{kind}"
         message = ChatMessage.objects.create(
-            sender=me, recipient=peer, body=body, audio=audio or "", audio_duration=duration
+            sender=me, recipient=peer, body=body, audio=audio or "", audio_duration=duration,
+            attachment=upload or "", attachment_name=original_name,
+            attachment_size=upload.size if upload else None,
         )
         # Your own message counts as read.
         ChatRead.objects.update_or_create(user=me, peer=peer, defaults={"last_read_id": message.pk})
         return Response(message_data(message), status=status.HTTP_201_CREATED)
+
+
+def visible_message(me, pk):
+    """A message you can see: in the team room, or sent to or by you. 404 otherwise."""
+    message = (
+        ChatMessage.objects.filter(pk=pk)
+        .filter(Q(recipient__isnull=True) | Q(recipient=me) | Q(sender=me))
+        .first()
+    )
+    if message is None:
+        raise Http404
+    return message
 
 
 class ChatAudioView(APIView):
@@ -295,17 +331,35 @@ class ChatAudioView(APIView):
     permission_classes = [IsTeamMember]
 
     def get(self, request, pk):
-        me = request.user
-        message = (
-            ChatMessage.objects.filter(pk=pk)
-            .filter(Q(recipient__isnull=True) | Q(recipient=me) | Q(sender=me))
-            .first()
-        )
-        if message is None or not message.audio:
+        message = visible_message(request.user, pk)
+        if not message.audio:
             raise Http404
         extension = message.audio.name.rsplit(".", 1)[-1]
         response = FileResponse(message.audio.open("rb"), content_type=FORMATS.get(extension, "application/octet-stream"))
         response["Cache-Control"] = "private, max-age=86400"
+        return response
+
+
+class ChatFileView(APIView):
+    """Downloads a shared file (images open in the browser), only for people in its conversation."""
+
+    permission_classes = [IsTeamMember]
+
+    def get(self, request, pk):
+        message = visible_message(request.user, pk)
+        if not message.attachment:
+            raise Http404
+        extension = extension_of(message.attachment.name)
+        inline = extension in IMAGES and request.query_params.get("download") is None
+        response = FileResponse(
+            message.attachment.open("rb"),
+            as_attachment=not inline,
+            filename=message.attachment_name or f"file.{extension}",
+            content_type=ALLOWED.get(extension, "application/octet-stream"),
+        )
+        response["Cache-Control"] = "private, max-age=86400"
+        # Belt and braces: nothing served here may run as a page.
+        response["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'"
         return response
 
 

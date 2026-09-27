@@ -114,8 +114,24 @@ export function formatDuration(seconds) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
+export function formatBytes(bytes) {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+// Mirrors the server's list, so people get instant feedback; the server still checks.
+export const CHAT_FILE_ACCEPT =
+  '.pdf,.doc,.docx,.odt,.rtf,.txt,.md,.xls,.xlsx,.ods,.csv,.ppt,.pptx,.odp,.zip,.rar,.7z,.png,.jpg,.jpeg,.gif,.webp'
+export const MAX_CHAT_FILE_BYTES = 20 * 1024 * 1024
+
 // What a message says in previews and notifications.
 export function messageText(message) {
+  if (message.file) {
+    const label = message.file.is_image ? '🖼 Photo' : `📎 ${message.file.name}`
+    return message.body ? `${label}: ${message.body}` : label
+  }
   if (message.body) return message.body
   if (message.audio) return `🎤 Voice message${message.audio_duration ? ` (${formatDuration(message.audio_duration)})` : ''}`
   return ''

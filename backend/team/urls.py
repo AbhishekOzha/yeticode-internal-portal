@@ -9,6 +9,7 @@ urlpatterns = [
     path("chat/contacts/", views.ChatContactsView.as_view(), name="chat-contacts"),
     path("chat/messages/", views.ChatMessagesView.as_view(), name="chat-messages"),
     path("chat/messages/<int:pk>/audio/", views.ChatAudioView.as_view(), name="chat-audio"),
+    path("chat/messages/<int:pk>/file/", views.ChatFileView.as_view(), name="chat-file"),
     path("chat/read/", views.ChatReadView.as_view(), name="chat-read"),
     path("chat/updates/", views.ChatUpdatesView.as_view(), name="chat-updates"),
     path("team/reviews/", reviews.ReviewWriteView.as_view(), name="reviews"),

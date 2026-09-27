@@ -69,6 +69,11 @@ def voice_upload_to(instance, filename):
     return f"chat_voice/{uuid.uuid4().hex}.{extension}"
 
 
+def attachment_upload_to(instance, filename):
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else "bin"
+    return f"chat_files/{uuid.uuid4().hex}.{extension}"
+
+
 class ChatMessage(models.Model):
     """A message to the whole team (no recipient) or to one colleague."""
 
@@ -80,6 +85,9 @@ class ChatMessage(models.Model):
     body = models.TextField(max_length=4000, blank=True)
     audio = models.FileField(upload_to=voice_upload_to, storage=private_storage, blank=True)
     audio_duration = models.PositiveIntegerField(null=True, blank=True, help_text="Seconds.")
+    attachment = models.FileField(upload_to=attachment_upload_to, storage=private_storage, blank=True, max_length=200)
+    attachment_name = models.CharField(max_length=255, blank=True, help_text="The file's original name.")
+    attachment_size = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
@@ -87,7 +95,7 @@ class ChatMessage(models.Model):
         indexes = [models.Index(fields=["sender", "recipient", "id"])]
 
     def __str__(self):
-        return f"{self.sender} → {self.recipient or 'team'}: {self.body[:40] or 'voice message'}"
+        return f"{self.sender} → {self.recipient or 'team'}: {self.body[:40] or self.attachment_name or 'voice message'}"
 
 
 class ChatRead(models.Model):
