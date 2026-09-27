@@ -4,7 +4,7 @@ import { App, Badge, Button, Card, Empty, Flex, Grid, Input, Skeleton, Tooltip, 
 import { teamApi } from '../api'
 import { NotificationSwitch } from '../components/NotificationSwitch'
 import { ChatAttachment } from '../components/ChatAttachment'
-import { GroupAvatar, GroupModal, OnlineAvatar, Ticks } from '../components/ChatBits'
+import { GroupAvatar, GroupModal, OnlineAvatar, ReceiptLabel, Ticks } from '../components/ChatBits'
 import { PersonAvatar } from '../components/People'
 import { VoiceRecorder } from '../components/VoiceRecorder'
 import { displayName } from '../people'
@@ -175,6 +175,8 @@ function Conversation({ me, target, people, onBack, onSent, onManageGroup }) {
     }
   }
 
+  // The spelled-out receipt goes under your most recent message only.
+  const lastMineId = [...(messages ?? [])].reverse().find((m) => m.sender === me.id)?.id
   const title = group ? group.name : peer ? displayName(peer) : 'Content team'
   const peerPresence = peer ? presence[String(peer.id)] ?? { online: peer.online, last_seen: peer.last_seen } : null
   const onlineCount = Object.values(presence).filter((p) => p.online).length + 1
@@ -252,10 +254,11 @@ function Conversation({ me, target, people, onBack, onSent, onManageGroup }) {
                       {m.file && <ChatAttachment file={m.file} mine={mine} />}
                       {m.body}
                       <span className="chat-time">
-                        {timeOf(m.created_at)}
+                        <span className="chat-time-text">{timeOf(m.created_at)}</span>
                         {mine && <Ticks message={m} receipts={receipts} />}
                       </span>
                     </div>
+                    {m.id === lastMineId && <ReceiptLabel message={m} receipts={receipts} />}
                   </div>
                 </Flex>
               </div>

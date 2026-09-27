@@ -25,37 +25,52 @@ export function GroupAvatar({ size = 40, team = false }) {
   )
 }
 
+const TICK_COLORS = {
+  sent: 'rgba(255, 255, 255, 0.6)',
+  delivered: '#ffffff',
+  // Green reads clearly on the blue bubble (WhatsApp's blue wouldn't).
+  seen: '#4ade80',
+}
+const RECEIPT_LABELS = { sent: 'Sent', delivered: 'Delivered', seen: 'Seen' }
+
 function TickIcon({ double, color }) {
   return (
-    <svg width={double ? 18 : 12} height="11" viewBox={double ? '0 0 18 11' : '0 0 12 11'} aria-hidden="true">
-      <path d="M1 6l3.5 3.5L11 2" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={double ? 20 : 14} height="13" viewBox={double ? '0 0 20 13' : '0 0 14 13'} aria-hidden="true">
+      <path d="M1.5 7l3.8 3.8L12.5 2.5" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
       {double && (
-        <path d="M7.5 9.5L8 10 14.5 2" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M9 10.3l.5.5L17.5 2.5" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
       )}
     </svg>
   )
 }
 
-// ✓ sent, ✓✓ delivered, blue ✓✓ seen. In groups the tooltip says who has seen it.
+function describe(r) {
+  if (r.total <= 1) return RECEIPT_LABELS[r.state]
+  if (r.state === 'seen') return `Seen by everyone (${r.total})`
+  const names = r.seen.map((x) => x.name)
+  return `Seen by ${r.seen.length} of ${r.total}${names.length ? `: ${names.join(', ')}` : ''} · delivered to ${r.delivered.length}`
+}
+
+// ✓ sent, ✓✓ delivered, green ✓✓ seen. In groups the tooltip says who has seen it.
 export function Ticks({ message, receipts }) {
   const r = receiptState(message, receipts)
   if (!r) return null
-  const label = { sent: 'Sent', delivered: 'Delivered', seen: 'Seen' }[r.state]
-  let title = label
-  if (r.total > 1) {
-    const seenNames = r.seen.map((x) => x.name)
-    title =
-      r.state === 'seen'
-        ? `Seen by everyone (${r.total})`
-        : `Seen by ${r.seen.length} of ${r.total}${seenNames.length ? `: ${seenNames.join(', ')}` : ''} · delivered to ${r.delivered.length}`
-  }
+  const title = describe(r)
   return (
     <Tooltip title={title}>
-      <span className="chat-ticks" aria-label={title}>
-        <TickIcon double={r.state !== 'sent'} color={r.state === 'seen' ? '#7fdcff' : 'rgba(255,255,255,0.75)'} />
+      <span className={`chat-ticks ${r.state}`} aria-label={title}>
+        <TickIcon double={r.state !== 'sent'} color={TICK_COLORS[r.state]} />
       </span>
     </Tooltip>
   )
+}
+
+// A small "Sent / Delivered / Seen" line under your latest message, spelled out.
+export function ReceiptLabel({ message, receipts }) {
+  const r = receiptState(message, receipts)
+  if (!r) return null
+  const text = r.total > 1 && r.state !== 'seen' && r.seen.length ? `Seen by ${r.seen.length} of ${r.total}` : r.total > 1 && r.state === 'seen' ? 'Seen by everyone' : RECEIPT_LABELS[r.state]
+  return <div className={`chat-receipt-label ${r.state}`}>{text}</div>
 }
 
 // Create a group, or (with `group`) rename it, add or remove people, or leave it.
