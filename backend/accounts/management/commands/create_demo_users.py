@@ -2,6 +2,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from accounts.models import Role, User
+from accounts.usernames import slugify_username
 
 # Sample people for local development, one per role: (unit, role) -> (first, last).
 DEMO_PEOPLE = {
@@ -24,7 +25,7 @@ DEMO_PEOPLE = {
 
 
 class Command(BaseCommand):
-    help = "Development only: create one sample person per role, signing in with their email."
+    help = "Development only: create one sample person per role (username first.last, e.g. nabin.poudel)."
 
     def add_arguments(self, parser):
         parser.add_argument("--password", default="demo-pass-123")
@@ -37,13 +38,14 @@ class Command(BaseCommand):
             unit_code = role.unit.code if role.unit else None
             first, last = DEMO_PEOPLE.get((unit_code, role.code), (role.name, "Demo"))
             email = f"{first}.{last}@{domain}".lower()
+            username = slugify_username(email)  # e.g. nabin.poudel
             user, created = User.objects.get_or_create(
-                username=email,
+                username=username,
                 defaults={"role": role, "email": email, "first_name": first, "last_name": last},
             )
             if created:
                 user.set_password(password)
                 user.save()
             status = "created" if created else "exists "
-            self.stdout.write(f"{status}  {email:40} {role.name} ({role.unit or 'All units'})")
+            self.stdout.write(f"{status}  {username:28} {email:40} {role.name} ({role.unit or 'All units'})")
         self.stdout.write(self.style.SUCCESS(f"Demo password: {password}"))

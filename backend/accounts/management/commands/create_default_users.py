@@ -3,7 +3,8 @@ import logging
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from accounts.models import Role, User
+from accounts.models import CompanySettings, Role, User
+from accounts.usernames import slugify_username
 from accounts.rbac import UNIT_ADMINS, UNITS
 
 logger = logging.getLogger(__name__)
@@ -15,8 +16,9 @@ LEGACY_SYSTEM_USERNAME = "superadmin"
 class Command(BaseCommand):
     """Create the Super Admin and one admin account per unit if they are missing.
 
-    Accounts sign in with their email address. Accounts made by earlier
-    versions of this command (superadmin, web_admin, ...) are renamed in place.
+    Usernames are short (admin, webdev.lead, ...) and emails use DEFAULT_EMAIL_DOMAIN.
+    Accounts made by earlier versions of this command (superadmin, web_admin, or
+    email-style usernames) are renamed in place, keeping their passwords.
     """
 
     help = "Create the default Super Admin and unit admin accounts"
@@ -26,14 +28,22 @@ class Command(BaseCommand):
         unit_password = self.password(settings.UNIT_ADMIN_PASSWORD, "UNIT_ADMIN_PASSWORD")
         domain = settings.DEFAULT_EMAIL_DOMAIN
 
-        email = settings.SYSTEM_USERNAME
+        company = CompanySettings.load()
+        if not company.domain:
+            company.domain = domain.lower()
+            company.save()
+
+        # SYSTEM_USERNAME may be an older-style email; the username is just its name part.
+        system_username = slugify_username(settings.SYSTEM_USERNAME) or "admin"
+        system_email = f"{system_username}@{domain}"
         self.ensure(
-            email=email,
-            legacy_username=LEGACY_SYSTEM_USERNAME,
+            username=system_username,
+            email=system_email,
+            legacy_usernames=[LEGACY_SYSTEM_USERNAME, settings.SYSTEM_USERNAME, system_email],
             first_name="System Administrator",
             label="Super Admin",
             create=lambda: User.objects.create_superuser(
-                username=email, email=email, password=system_password,
+                username=system_username, email=system_email, password=system_password,
                 first_name="System Administrator",
             ),
         )
@@ -44,35 +54,37 @@ class Command(BaseCommand):
                 raise CommandError(f"Role {role_code} not found. Run `python manage.py migrate` first.")
             unit_email = f"{local_part}@{domain}"
             self.ensure(
+                username=local_part,
                 email=unit_email,
-                legacy_username=legacy,
+                legacy_usernames=[legacy, unit_email],
                 first_name=display_name,
                 label=f"{role.name}, {UNITS[unit_code]}",
-                create=lambda unit_email=unit_email, role=role, display_name=display_name: (
+                create=lambda local_part=local_part, unit_email=unit_email, role=role, display_name=display_name: (
                     User.objects.create_user(
-                        username=unit_email, email=unit_email, password=unit_password,
+                        username=local_part, email=unit_email, password=unit_password,
                         role=role, first_name=display_name,
                     )
                 ),
             )
 
-    def ensure(self, email, legacy_username, first_name, label, create):
-        if User.objects.filter(username__iexact=email).exists():
-            self.say(f"Already exists: {email} ({label})")
+    def ensure(self, username, email, legacy_usernames, first_name, label, create):
+        if User.objects.filter(username__iexact=username).exists():
+            self.say(f"Already exists: {username} ({label})")
             return
-        legacy = User.objects.filter(username=legacy_username).first()
+        legacy = User.objects.filter(username__in=[u for u in legacy_usernames if u]).first()
         if legacy is not None:
-            legacy.username = email
+            old = legacy.username
+            legacy.username = username
             legacy.email = email
             legacy.first_name = first_name
             legacy.last_name = ""
             legacy.save()
-            logger.info("Renamed %s to %s", legacy_username, email)
-            self.say(f"Renamed {legacy_username} to {email} ({label})", success=True)
+            logger.info("Renamed %s to %s", old, username)
+            self.say(f"Renamed {old} to {username} ({label})", success=True)
             return
         create()
-        logger.info("Created %s (%s)", email, label)
-        self.say(f"Created {email} ({label})", success=True)
+        logger.info("Created %s (%s)", username, label)
+        self.say(f"Created {username} <{email}> ({label})", success=True)
 
     def password(self, configured, setting_name):
         if configured:

@@ -1,8 +1,11 @@
+import re
+
 from rest_framework import serializers
 
 from .dashboard import can_manage_users, capabilities_for, dashboard_for
 from .models import CompanySettings, Role, Unit, User, email_in_use
 from .uploads import delete_replaced_file, validate_image
+from .usernames import full_username
 
 
 class ImageUrlField(serializers.ImageField):
@@ -34,14 +37,18 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     can_manage_users = serializers.SerializerMethodField()
     can_manage_roles = serializers.BooleanField(source="is_superuser", read_only=True)
     avatar = ImageUrlField(read_only=True)
+    login = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
-            "id", "username", "full_name", "first_name", "last_name", "email", "secondary_email",
+            "id", "username", "login", "full_name", "first_name", "last_name", "email", "secondary_email",
             "avatar", "unit", "role", "is_super_admin", "last_login", "capabilities", "dashboard",
             "can_manage_users", "can_manage_roles",
         ]
+
+    def get_login(self, obj):
+        return full_username(obj.username)
 
     def get_capabilities(self, obj):
         return capabilities_for(obj)
@@ -125,7 +132,7 @@ class BrandingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CompanySettings
-        fields = ["name", "tagline", "logo", "updated_at"]
+        fields = ["name", "tagline", "domain", "logo", "updated_at"]
 
 
 class CompanySettingsSerializer(serializers.ModelSerializer):
@@ -133,8 +140,14 @@ class CompanySettingsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CompanySettings
-        fields = ["name", "tagline", "email", "phone", "website", "address", "logo", "updated_at"]
+        fields = ["name", "tagline", "domain", "email", "phone", "website", "address", "logo", "updated_at"]
         read_only_fields = ["updated_at"]
+
+    def validate_domain(self, value):
+        value = value.strip().lower().lstrip("@")
+        if value and not re.match(r"^(?=.{3,120}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$", value):
+            raise serializers.ValidationError("Enter a domain like corecontent.com (no @ or https://).")
+        return value
 
     def update(self, instance, validated_data):
         old_logo = instance.logo.name

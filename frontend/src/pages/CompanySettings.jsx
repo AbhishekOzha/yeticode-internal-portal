@@ -76,7 +76,13 @@ export default function CompanySettings() {
 
   function applySaved(settings) {
     form.setFieldsValue(settings)
-    setBranding({ name: settings.name, tagline: settings.tagline, logo: settings.logo, updated_at: settings.updated_at })
+    setBranding({
+      name: settings.name,
+      tagline: settings.tagline,
+      domain: settings.domain,
+      logo: settings.logo,
+      updated_at: settings.updated_at,
+    })
   }
 
   useEffect(() => {
@@ -149,6 +155,21 @@ export default function CompanySettings() {
                 <Col xs={24} md={12}>
                   <Form.Item label="Tagline" name="tagline" extra="Shown under the name on the sign-in page.">
                     <Input maxLength={120} placeholder="Staff portal" />
+                  </Form.Item>
+                </Col>
+                <Col span={24}>
+                  <Form.Item
+                    label="Organisation domain"
+                    name="domain"
+                    extra="Completes everyone's username: with corecontent.com, the username abhishekojha signs in as abhishekojha@corecontent.com."
+                    rules={[
+                      {
+                        pattern: /^\s*@?[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+\s*$/,
+                        message: 'Enter a domain like corecontent.com',
+                      },
+                    ]}
+                  >
+                    <Input prefix="@" placeholder="corecontent.com" maxLength={120} />
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={12}>

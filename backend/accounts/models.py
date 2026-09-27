@@ -178,6 +178,10 @@ class CompanySettings(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=120, default="Yeticode Innovations")
     tagline = models.CharField(max_length=120, blank=True, default="Staff portal")
+    domain = models.CharField(
+        max_length=120, blank=True,
+        help_text="e.g. corecontent.com. Usernames are completed with it: abhishekojha@corecontent.com.",
+    )
     email = models.EmailField("contact email", blank=True)
     phone = models.CharField(max_length=40, blank=True)
     website = models.URLField(blank=True)

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LockOutlined, MailOutlined } from '@ant-design/icons'
+import { LockOutlined, UserOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Flex, Form, Input, Typography } from 'antd'
 import { api } from '../api'
 import { LogoMark } from '../components/Logo'
@@ -82,12 +82,17 @@ export default function Login({ onLogin }) {
           </Flex>
           <Typography.Title level={2} style={{ marginBottom: 4 }}>Welcome back</Typography.Title>
           <Typography.Paragraph type="secondary" style={{ marginBottom: 28 }}>
-            Sign in with the email your administrator gave you.
+            Sign in with your username{branding.domain ? ` (or username@${branding.domain})` : ''} or your email.
           </Typography.Paragraph>
           {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 20 }} />}
           <Form layout="vertical" requiredMark={false} onFinish={handleFinish} size="large">
-            <Form.Item label="Email or username" name="username" rules={[{ required: true, message: 'Enter your email' }]}>
-              <Input prefix={<MailOutlined />} placeholder="name@yeticode.com" autoComplete="username" autoFocus />
+            <Form.Item label="Username or email" name="username" rules={[{ required: true, message: 'Enter your username or email' }]}>
+              <Input
+                prefix={<UserOutlined />}
+                placeholder={branding.domain ? `abhishekojha or abhishekojha@${branding.domain}` : 'abhishekojha or your email'}
+                autoComplete="username"
+                autoFocus
+              />
             </Form.Item>
             <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Enter your password' }]}>
               <Input.Password prefix={<LockOutlined />} placeholder="Your password" autoComplete="current-password" />

@@ -32,7 +32,8 @@ import {
 } from 'antd'
 import { api } from '../api'
 import { PersonCell, UnitTag } from '../components/People'
-import { displayName } from '../people'
+import { useBranding } from '../branding'
+import { USERNAME_PATTERN, displayName, suggestUsername } from '../people'
 
 const SUPER_ADMIN = 'super_admin'
 
@@ -71,6 +72,10 @@ function UserDrawer({ open, user, roles, currentUser, onClose, onSaved }) {
   const [form] = Form.useForm()
   const [busy, setBusy] = useState(false)
   const isNew = !user
+  const { branding } = useBranding()
+  const domain = branding.domain
+  // New accounts get a username from their name until someone types one.
+  const [usernameTouched, setUsernameTouched] = useState(false)
   const isSelf = user?.id === currentUser.id
   const ownEmailLocked = isSelf && !currentUser.is_super_admin
 
@@ -113,7 +118,7 @@ function UserDrawer({ open, user, roles, currentUser, onClose, onSaved }) {
     const payload = {
       email: values.email.trim(),
       secondary_email: (values.secondary_email || '').trim(),
-      username: (values.username || values.email).trim(),
+      username: (values.username || '').trim().toLowerCase() || undefined,
       first_name: values.first_name.trim(),
       last_name: (values.last_name || '').trim(),
       is_active: values.is_active,
@@ -145,7 +150,16 @@ function UserDrawer({ open, user, roles, currentUser, onClose, onSaved }) {
         </Button>
       }
     >
-      <Form form={form} layout="vertical" requiredMark="optional" onFinish={handleFinish}>
+      <Form
+        form={form}
+        layout="vertical"
+        requiredMark="optional"
+        onFinish={handleFinish}
+        onValuesChange={(changed, all) => {
+          if (!isNew || usernameTouched || !('first_name' in changed || 'last_name' in changed)) return
+          form.setFieldsValue({ username: suggestUsername(`${all.first_name || ''}${all.last_name || ''}`) })
+        }}
+      >
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item label="First name" name="first_name" rules={[{ required: true, whitespace: true, message: 'Enter a first name' }]}>
@@ -159,16 +173,42 @@ function UserDrawer({ open, user, roles, currentUser, onClose, onSaved }) {
           </Col>
         </Row>
         <Form.Item
+          label="Username"
+          name="username"
+          extra={
+            domain
+              ? `Just the name part. They sign in as username@${domain}, the username alone, or their email.`
+              : 'Just the name part. Set the organisation domain in Company settings to complete it.'
+          }
+          rules={[
+            { required: !isNew, message: 'Enter a username' },
+            {
+              validator: (_, value) =>
+                !value || USERNAME_PATTERN.test(value.trim().toLowerCase())
+                  ? Promise.resolve()
+                  : Promise.reject(new Error(value.includes('@') ? 'Only the name part, e.g. abhishekojha; the domain is added automatically' : '2–30 lowercase letters or numbers; . _ - allowed in between')),
+            },
+          ]}
+          normalize={(v) => (v || '').toLowerCase().replace(/\s+/g, '')}
+        >
+          <Input
+            placeholder="abhishekojha"
+            autoComplete="off"
+            onChange={() => setUsernameTouched(true)}
+            suffix={domain ? <Typography.Text type="secondary">@{domain}</Typography.Text> : null}
+          />
+        </Form.Item>
+        <Form.Item
           label="Primary email"
           name="email"
           extra={
             ownEmailLocked
               ? 'Ask a Super Admin to change your own primary email.'
-              : 'They sign in with this email. It is required.'
+              : 'Required. They can also sign in with it.'
           }
           rules={[{ required: true, type: 'email', message: 'Enter a valid email address' }]}
         >
-          <Input placeholder="name@yeticode.com" autoComplete="off" disabled={ownEmailLocked} />
+          <Input placeholder="name@example.com" autoComplete="off" disabled={ownEmailLocked} />
         </Form.Item>
         <Form.Item
           label="Secondary email"
@@ -186,11 +226,6 @@ function UserDrawer({ open, user, roles, currentUser, onClose, onSaved }) {
         >
           <Input placeholder="personal@example.com" autoComplete="off" allowClear />
         </Form.Item>
-        {!isNew && user?.username !== user?.email && (
-          <Form.Item label="Username" name="username" extra="Older accounts may also sign in with a username.">
-            <Input />
-          </Form.Item>
-        )}
         <Form.Item
           label="Role"
           name="role"
@@ -301,7 +336,7 @@ export default function Users({ user: currentUser }) {
     if (status === 'active' && !u.is_active) return false
     if (status === 'inactive' && u.is_active) return false
     if (unit !== 'all' && (u.unit_code ?? 'company') !== unit) return false
-    const text = `${u.first_name} ${u.last_name} ${u.username} ${u.email} ${u.role_name ?? ''}`.toLowerCase()
+    const text = `${u.first_name} ${u.last_name} ${u.login} ${u.email} ${u.role_name ?? ''}`.toLowerCase()
     return text.includes(query.trim().toLowerCase())
   })
 
@@ -332,6 +367,13 @@ export default function Users({ user: currentUser }) {
       key: 'name',
       render: (_, u) => <PersonCell person={u} muted={!u.is_active} />,
       sorter: (a, b) => displayName(a).localeCompare(displayName(b)),
+    },
+    {
+      title: 'Username',
+      key: 'username',
+      responsive: ['lg'],
+      render: (_, u) => <Typography.Text className="mono">{u.login}</Typography.Text>,
+      sorter: (a, b) => a.username.localeCompare(b.username),
     },
     {
       title: 'Role',
@@ -428,7 +470,7 @@ export default function Users({ user: currentUser }) {
             <Input
               allowClear
               prefix={<SearchOutlined />}
-              placeholder="Search name, email or role"
+              placeholder="Search name, username, email or role"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               style={{ width: 280 }}
@@ -465,6 +507,7 @@ export default function Users({ user: currentUser }) {
       </Card>
 
       <UserDrawer
+        key={drawer.open ? drawer.user?.id ?? 'new' : 'closed'}
         open={drawer.open}
         user={drawer.user}
         roles={roles}

@@ -40,18 +40,20 @@ python manage.py create_demo_users      # optional, dev only: one sample person 
 python manage.py runserver              # http://localhost:8000/admin/
 ```
 
-`create_default_users` makes these accounts if they don't exist yet. Everyone
-signs in with their email (the domain comes from `DEFAULT_EMAIL_DOMAIN`):
+`create_default_users` makes these accounts if they don't exist yet. People sign in
+with their **username** (just the name part, e.g. `admin`), the full `username@<domain>`
+(the organisation domain is set in **Company settings**, starting from `DEFAULT_EMAIL_DOMAIN`),
+or their email:
 
-| Sign-in email | Name | Role |
-| --- | --- | --- |
-| `admin@yeticode.com` (or `SYSTEM_USERNAME`) | System Administrator | Super Admin, all units |
-| `webdev.lead@yeticode.com` | Web Development Lead | Team Lead, manages Web App Development users |
-| `training.manager@yeticode.com` | Training Manager | Training Manager, manages Training users |
-| `production.manager@yeticode.com` | Production Manager | Production Manager, manages Academic Content Writing users |
+| Username | Email | Name | Role |
+| --- | --- | --- | --- |
+| `admin` (or `SYSTEM_USERNAME`) | `admin@yeticode.com` | System Administrator | Super Admin, all units |
+| `webdev.lead` | `webdev.lead@yeticode.com` | Web Development Lead | Team Lead, manages Web App Development users |
+| `training.manager` | `training.manager@yeticode.com` | Training Manager | Training Manager, manages Training users |
+| `production.manager` | `production.manager@yeticode.com` | Production Manager | Production Manager, manages Academic Content Writing users |
 
-Accounts created by earlier versions (`superadmin`, `web_admin`, `training_admin`,
-`content_admin`) are renamed to these emails in place, keeping their passwords.
+Accounts created by earlier versions (`superadmin`, `web_admin`, … or email-style usernames)
+are renamed in place, keeping their passwords.
 Passwords come from `SYSTEM_USER_PASSWORD` and `UNIT_ADMIN_PASSWORD` in `.env`.
 With `DEBUG=TRUE` and no password set, they default to `yeticode@123`; in
 production the command refuses to run without them.
@@ -81,6 +83,7 @@ Check the frontend with `yarn lint` and `yarn build`. Run the backend tests with
 | IDs | Every record of the app's own (units, roles, users, company settings, payroll, office hours, chat, groups, reviews) has a random **UUID** primary key, so ids in URLs and the API can't be guessed or counted. Chat messages also carry an increasing `seq` from a database sequence, used for ordering, "new since", unread, delivered and seen. Django's built-in tables (permissions, content types, sessions) keep their own ids. |
 | Units | `Unit` model: Web App Development, Training, Academic Content Writing |
 | Roles | `Role` model with a set of capabilities. A role belongs to one unit, or to no unit when it is company-wide (Head HR). |
+| Usernames | Just the name part, e.g. `abhishekojha` (2–30 lowercase letters or numbers, with `.` `_` `-` between). The organisation **domain** in Company settings completes it: with `corecontent.com`, the person signs in as `abhishekojha@corecontent.com`, or with `abhishekojha` or their email. A new user's username is suggested from their name. |
 | Users | `User.role` (one role). `User.unit` is read from the role, so a user can't hold a role from another unit. A database constraint requires a role for everyone except Super Admins. |
 | Unit isolation | Unit-scoped roles only ever see their own unit. Cross-unit capabilities (`CROSS_UNIT_CAPABILITIES` in `accounts/rbac.py`) can only be given to company-wide roles; the admin form, the model layer and the API each refuse otherwise. |
 | Super Admin | `is_superuser`. The only users allowed into `/admin/`; they have every permission and no role. |

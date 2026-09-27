@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import CompanySettings, User
+from .usernames import username_from_login
 from .permissions import IsCompanyWide, IsSuperAdmin, has_capability
 from .serializers import (
     BrandingSerializer,
@@ -35,21 +36,22 @@ class LoginView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = authenticate(request, **serializer.validated_data)
-        if user is None:
-            # People may sign in with their email when it differs from their username.
-            match = User.objects.filter(
-                email__iexact=serializer.validated_data["username"].strip()
-            ).exclude(email="")
+        typed = serializer.validated_data["username"].strip()
+        password = serializer.validated_data["password"]
+        # "abhishekojha", "abhishekojha@<our domain>" or an email address all work.
+        user = None
+        username = username_from_login(typed)
+        if username:
+            match = User.objects.filter(username__iexact=username).first()
+            if match:
+                user = authenticate(request, username=match.username, password=password)
+        if user is None and "@" in typed:
+            match = User.objects.filter(email__iexact=typed).exclude(email="")
             if match.count() == 1:
-                user = authenticate(
-                    request,
-                    username=match.get().username,
-                    password=serializer.validated_data["password"],
-                )
+                user = authenticate(request, username=match.get().username, password=password)
         if user is None:
             return Response(
-                {"detail": "Incorrect email or password."},
+                {"detail": "Incorrect username, email or password."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         login(request, user)

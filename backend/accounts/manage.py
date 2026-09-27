@@ -13,6 +13,7 @@ from rest_framework.permissions import BasePermission
 
 from .dashboard import can_manage_users
 from .models import Role, User, check_role_capabilities, email_in_use
+from .usernames import clean_username, company_domain, full_username, slugify_username, unique_username
 from .permissions import IsSuperAdmin
 from .serializers import ImageUrlField
 from .rbac import CAPABILITIES, CAPABILITY_GROUPS, CROSS_UNIT_CAPABILITIES
@@ -41,15 +42,31 @@ class ManagedUserSerializer(serializers.ModelSerializer):
         write_only=True, required=False, allow_blank=False, trim_whitespace=False
     )
     avatar = ImageUrlField(read_only=True)
+    # Just the name part, e.g. "abhishekojha"; `login` adds the organisation's domain.
+    username = serializers.CharField(required=False, max_length=30)
+    login = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
-            "id", "username", "first_name", "last_name", "email", "secondary_email", "avatar",
+            "id", "username", "login", "first_name", "last_name", "email", "secondary_email", "avatar",
             "role", "role_name", "unit", "unit_code", "is_super_admin", "is_active",
             "password", "last_login", "date_joined",
         ]
         read_only_fields = ["last_login", "date_joined"]
+
+    def get_login(self, obj):
+        return full_username(obj.username, self.context.get("domain"))
+
+    def validate_username(self, value):
+        try:
+            value = clean_username(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages)
+        others = User.objects.exclude(pk=self.instance.pk if self.instance else None)
+        if others.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("Another account already has this username.")
+        return value
 
     def get_unit(self, obj):
         if obj.is_superuser:
@@ -84,6 +101,14 @@ class ManagedUserSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"role": "You cannot change your own access."})
 
         self.validate_emails(attrs, actor)
+        if instance is None and not attrs.get("username"):
+            # No username typed: suggest one from the name, then the email.
+            base = (
+                slugify_username(f"{attrs.get('first_name', '')}{attrs.get('last_name', '')}")
+                or slugify_username(attrs.get("email", ""))
+            )
+            taken = {u.lower() for u in User.objects.values_list("username", flat=True)}
+            attrs["username"] = unique_username(base, taken)
 
         password = attrs.get("password")
         if instance is None and not password:
@@ -102,7 +127,7 @@ class ManagedUserSerializer(serializers.ModelSerializer):
         return attrs
 
     def validate_emails(self, attrs, actor):
-        """The primary email is the sign-in address: required, unique, and kept in the username."""
+        """The primary email is required and unique across accounts."""
         instance = self.instance
         if "email" in attrs:
             email = attrs["email"] = attrs["email"].strip()
@@ -115,13 +140,6 @@ class ManagedUserSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"email": "Ask a Super Admin to change your own primary email."}
                 )
-            # Accounts whose username is their email keep the two in step.
-            if (
-                instance is not None
-                and instance.username.lower() == (instance.email or "").lower()
-                and attrs.get("username", instance.username) == instance.username
-            ):
-                attrs["username"] = email
         email = attrs.get("email", instance.email if instance else "")
 
         if "secondary_email" in attrs:
@@ -132,13 +150,6 @@ class ManagedUserSerializer(serializers.ModelSerializer):
                 )
             if secondary and email_in_use(secondary, exclude=instance):
                 raise serializers.ValidationError({"secondary_email": "Another account already uses this email."})
-
-        username = attrs.get("username")
-        if username and User.objects.exclude(pk=instance.pk if instance else None).filter(
-            username__iexact=username
-        ).exists():
-            field = "email" if username == email else "username"
-            raise serializers.ValidationError({field: "Another account already uses this sign-in name."})
 
     def create(self, validated_data):
         password = validated_data.pop("password")
@@ -169,6 +180,9 @@ class ManagedUserViewSet(
     serializer_class = ManagedUserSerializer
     permission_classes = [CanManageUsers]
     pagination_class = None
+
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), "domain": company_domain()}
 
     def get_queryset(self):
         users = User.objects.select_related("role__unit").order_by(

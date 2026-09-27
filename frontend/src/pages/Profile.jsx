@@ -138,7 +138,7 @@ function SecondaryEmail({ user, onUserChange }) {
 export default function Profile({ user, onUserChange }) {
   const details = [
     { key: 'name', label: 'Full name', children: displayName(user) },
-    user.username !== user.email && { key: 'username', label: 'Username', children: user.username },
+    { key: 'username', label: 'Username', children: <span className="mono">{user.login}</span> },
     { key: 'role', label: 'Role', children: user.is_super_admin ? 'Super Admin' : user.role.name },
     { key: 'unit', label: 'Unit', children: user.unit ? user.unit.name : 'All units' },
     {

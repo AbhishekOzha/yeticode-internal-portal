@@ -150,14 +150,14 @@ class AdminEmailTests(UploadTestCase):
         self.assertEqual(self.student.secondary_email, "student@example.com")
         self.assertEqual(self.student.username, "learner", "a separate username is left alone")
 
-    def test_username_follows_email_when_it_was_the_email(self):
+    def test_changing_email_keeps_the_username(self):
         self.as_user(self.boss)
         response = self.client.patch(
             f"/api/manage/users/{self.dev.pk}/", {"email": "developer@yeticode.com"}, format="json"
         )
         self.assertEqual(response.status_code, 200, response.json())
         self.dev.refresh_from_db()
-        self.assertEqual(self.dev.username, "developer@yeticode.com")
+        self.assertEqual(self.dev.username, "dev@yeticode.com")  # usernames are separate from emails now
         self.client.logout()
         login = self.client.post(
             "/api/auth/login/", {"username": "developer@yeticode.com", "password": PASSWORD}, format="json"
