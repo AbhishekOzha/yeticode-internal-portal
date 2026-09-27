@@ -190,6 +190,19 @@ class Review(models.Model):
         return f"{self.author} on {self.subject} ({self.month:%Y-%m}): {self.rating}/5"
 
 
+# Leave types that are paid. For now none are: every leave day is unpaid and
+# comes off the payslip. Add a type here (e.g. "sick") to make it paid.
+PAID_LEAVE_KINDS = frozenset()
+
+
+def leave_kind_label(kind):
+    """The type's name, marked "(Unpaid)" unless it's paid, e.g. "Casual leave (Unpaid)"."""
+    label = LeaveRequest.Kind(kind).label
+    if kind in PAID_LEAVE_KINDS or kind == LeaveRequest.Kind.UNPAID:
+        return label
+    return f"{label} (Unpaid)"
+
+
 class LeaveRequest(models.Model):
     """A leave application from someone in the team, approved or rejected by the Production Manager or HR."""
 
@@ -229,6 +242,14 @@ class LeaveRequest(models.Model):
 
     def __str__(self):
         return f"{self.user}: {self.get_kind_display()} {self.start_date}–{self.end_date} ({self.status})"
+
+    @property
+    def paid(self):
+        return self.kind in PAID_LEAVE_KINDS
+
+    @property
+    def kind_label(self):
+        return leave_kind_label(self.kind)
 
     @property
     def days(self):

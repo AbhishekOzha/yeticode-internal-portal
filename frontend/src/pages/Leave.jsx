@@ -111,7 +111,11 @@ function ApplyForm({ approvers, kinds, onApplied }) {
         onFinish={handleFinish}
         initialValues={{ kind: 'casual', start_date: todayISO(), end_date: todayISO(), half_day: false }}
       >
-        <Form.Item label="Type" name="kind">
+        <Form.Item
+          label="Type"
+          name="kind"
+          extra="All leave is unpaid for now: each day is deducted from salary at the per-day rate (salary ÷ 30)."
+        >
           <Select options={kinds} />
         </Form.Item>
         <Row gutter={12}>

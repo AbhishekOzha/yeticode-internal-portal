@@ -48,7 +48,7 @@ class LeaveTests(TestCase):
         self.as_user(self.production)
         bell = self.client.get("/api/notifications/").json()
         self.assertEqual(bell["unread"], 1)
-        self.assertIn("Asha applied for casual leave", bell["notifications"][0]["title"])
+        self.assertEqual(bell["notifications"][0]["title"], "Asha applied for casual leave (Unpaid)")
         self.assertEqual(bell["notifications"][0]["link"], "leave")
 
     def test_approve_and_the_applicant_is_notified(self):
@@ -137,3 +137,12 @@ class LeaveTests(TestCase):
         # Only your own.
         self.as_user(self.production)
         self.assertEqual(self.client.get("/api/notifications/").json()["unread"], 1)
+
+    def test_every_type_is_marked_unpaid_for_now(self):
+        self.as_user(self.writer)
+        kinds = {k["value"]: k["label"] for k in self.client.get("/api/team/leave/").json()["kinds"]}
+        self.assertEqual(kinds["casual"], "Casual leave (Unpaid)")
+        self.assertEqual(kinds["sick"], "Sick leave (Unpaid)")
+        self.assertEqual(kinds["unpaid"], "Unpaid leave")
+        response = self.apply(kind="sick")
+        self.assertEqual((response.json()["kind_label"], response.json()["paid"]), ("Sick leave (Unpaid)", False))

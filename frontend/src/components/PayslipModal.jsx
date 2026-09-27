@@ -39,7 +39,7 @@ export function PayslipModal({ staff, month, onClose }) {
         ['Credit Amount', rupees(slip.credit_amount)],
         ...(Number(slip.performance) ? [['Performance bonus', rupees(slip.performance)]] : []),
         ...(Number(slip.effort) ? [['Effort bonus', rupees(slip.effort)]] : []),
-        ['Leave', `${slip.leave_days} Days`],
+        ['Leave (unpaid)', `${slip.leave_days} Days`],
         ['Salary Amount', rupees(slip.salary_amount)],
         ['Deducted Amount of Leave', rupees(slip.leave_deduction)],
       ]
@@ -55,7 +55,7 @@ export function PayslipModal({ staff, month, onClose }) {
       footer={
         <Flex justify="space-between" align="center">
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Per day = salary ÷ 30, rounded up · leave = approved leave this month
+            Per day = salary ÷ 30, rounded up · all approved leave is unpaid for now
           </Typography.Text>
           <Button type="primary" icon={<PrinterOutlined />} disabled={!slip} onClick={() => window.print()}>
             Print

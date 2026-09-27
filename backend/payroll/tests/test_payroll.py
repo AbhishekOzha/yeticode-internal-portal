@@ -251,11 +251,11 @@ class PayslipTests(PayrollTestCase):
         self.as_user(self.production)
         StaffPay.objects.create(user=self.writer, monthly_salary=Decimal("25000"))
 
-    def leave(self, start, end, status="approved", half_day=False):
+    def leave(self, start, end, status="approved", half_day=False, kind="casual"):
         from team.models import LeaveRequest
 
         return LeaveRequest.objects.create(
-            user=self.writer, start_date=start, end_date=end, status=status, half_day=half_day
+            user=self.writer, start_date=start, end_date=end, status=status, half_day=half_day, kind=kind
         )
 
     def slip(self, month="2026-05"):
@@ -321,3 +321,17 @@ class PayslipTests(PayrollTestCase):
             self.assertEqual(self.client.get(f"/api/payroll/staff/{self.writer.pk}/payslip/").status_code, 403)
         self.as_user(self.production)
         self.assertEqual(self.client.get(f"/api/payroll/staff/{self.dev.pk}/payslip/").status_code, 404)
+
+
+    def test_every_leave_type_is_deducted_for_now(self):
+        for day, kind in [("2026-05-04", "sick"), ("2026-05-05", "annual"), ("2026-05-06", "other")]:
+            self.leave(day, day, kind=kind)
+        self.assertEqual(self.slip()["leave_days"], "3")
+
+    def test_a_paid_type_would_not_be_deducted(self):
+        from unittest import mock
+
+        self.leave("2026-05-04", "2026-05-04", kind="sick")
+        self.leave("2026-05-05", "2026-05-05", kind="casual")
+        with mock.patch("payroll.payslip.PAID_LEAVE_KINDS", frozenset({"sick"})):
+            self.assertEqual(self.slip()["leave_days"], "1")

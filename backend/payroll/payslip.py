@@ -4,7 +4,8 @@ It follows the company's salary sheet:
 
     Per day income    = monthly salary / 30, rounded up to the rupee   (25,000 -> 834)
     Total days        = 30 for every month (the sheet's basis, whatever the calendar says)
-    Leave             = approved leave days in the month (half days count 0.5)
+    Leave             = approved unpaid leave days in the month (half days count 0.5);
+                        all leave types are unpaid for now (team.models.PAID_LEAVE_KINDS)
     Working days      = 30 - leave
     Salary amount     = working days x per day income                   (28 x 834 = 23,352),
                         never more than the monthly salary itself
@@ -17,7 +18,7 @@ It follows the company's salary sheet:
 import datetime
 from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 
-from team.models import LeaveRequest
+from team.models import PAID_LEAVE_KINDS, LeaveRequest
 
 from .models import PayExtra
 
@@ -31,12 +32,12 @@ def month_end(month):
 
 
 def leave_days(user, month):
-    """Approved leave inside the month; leave that runs across months only counts its days in this one."""
+    """Approved unpaid leave inside the month; leave that runs across months only counts its days in this one."""
     last = month_end(month)
     total = ZERO
     approved = LeaveRequest.objects.filter(
         user=user, status=LeaveRequest.Status.APPROVED, start_date__lte=last, end_date__gte=month
-    )
+    ).exclude(kind__in=PAID_LEAVE_KINDS)
     for leave in approved:
         if leave.half_day:
             total += Decimal("0.5")

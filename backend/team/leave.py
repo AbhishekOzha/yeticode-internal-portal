@@ -18,7 +18,7 @@ from rest_framework.views import APIView
 
 from notifications.models import notify
 
-from .models import LeaveRequest
+from .models import LeaveRequest, leave_kind_label
 from .views import IsTeamMember, in_team, person, team_members
 
 APPROVER_CAPABILITIES = ["manage_unit_users", "manage_employee_records"]
@@ -49,7 +49,8 @@ def leave_data(leave, viewer=None):
         "id": leave.pk,
         "user": person(leave.user),
         "kind": leave.kind,
-        "kind_label": leave.get_kind_display(),
+        "kind_label": leave.kind_label,
+        "paid": leave.paid,
         "start_date": leave.start_date.isoformat(),
         "end_date": leave.end_date.isoformat(),
         "half_day": leave.half_day,
@@ -101,7 +102,7 @@ class MyLeaveView(APIView):
         return Response({
             "requests": [leave_data(l, me) for l in LeaveRequest.objects.filter(user=me).select_related("user__role", "decided_by")],
             "approvers": [person(u) for u in approvers_for(me)],
-            "kinds": [{"value": v, "label": l} for v, l in LeaveRequest.Kind.choices],
+            "kinds": [{"value": v, "label": leave_kind_label(v)} for v, _ in LeaveRequest.Kind.choices],
         })
 
     def post(self, request):
@@ -124,7 +125,7 @@ class MyLeaveView(APIView):
             notify(
                 approvers,
                 "leave_requested",
-                f"{name} applied for {leave.get_kind_display().lower()}",
+                f"{name} applied for {leave.kind_label[0].lower()}{leave.kind_label[1:]}",
                 f"{date_range(leave)} · {leave.days:g} day{'s' if leave.days != 1 else ''}"
                 + (f" · “{leave.reason[:120]}”" if leave.reason else ""),
                 "leave",
