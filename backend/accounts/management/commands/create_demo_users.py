@@ -12,7 +12,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, password, **options):
         if not settings.DEBUG:
-            raise CommandError("Demo users can only be created with DJANGO_DEBUG=1.")
+            raise CommandError("Demo users can only be created with DEBUG=TRUE.")
         for role in Role.objects.select_related("unit"):
             user, created = User.objects.get_or_create(
                 username=role.code,

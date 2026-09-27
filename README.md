@@ -11,17 +11,13 @@ and the role decides the person's unit, permissions and dashboard.
 
 ### 1. Database
 
-The backend expects a PostgreSQL role and database both named `yeticode`
-(password `yeticode`). Pick one option.
+Any PostgreSQL 16 works. The connection comes from `backend/.env` (step 2):
+`DJANGO_DATABASE` (database name), `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`.
+With Homebrew on macOS (`brew install postgresql@16 && brew services start postgresql@16`)
+you can use your existing `postgres` user and its password.
 
-**Homebrew PostgreSQL on macOS** (`brew install postgresql@16 && brew services start postgresql@16`):
-
-```bash
-psql postgres -c "CREATE ROLE yeticode WITH LOGIN PASSWORD 'yeticode' CREATEDB;"
-createdb -O yeticode yeticode
-```
-
-**Docker**: `docker compose up -d db` creates both for you. Stop any other
+With Docker instead, `docker compose up -d db` starts one with database, user and
+password all set to `yeticode`; put those values in `.env`. Stop any other
 PostgreSQL on port 5432 first, or the two will clash.
 
 ### 2. Backend
@@ -30,7 +26,7 @@ PostgreSQL on port 5432 first, or the two will clash.
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env                    # local settings, loaded automatically; git ignores .env
+cp .env.example .env                    # then set DB_PASSWORD etc.; loaded automatically, git ignores it
 python manage.py migrate                # also creates the units, roles and default permissions
 python manage.py createsuperuser        # your first Super Admin
 python manage.py create_demo_users      # optional, dev only: one account per role

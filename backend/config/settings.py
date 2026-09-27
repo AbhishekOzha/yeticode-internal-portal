@@ -29,13 +29,13 @@ def env_list(name, default=""):
     return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
 
 
-DEBUG = env_bool("DJANGO_DEBUG", False)
+DEBUG = env_bool("DEBUG", False)
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or (
     "dev-only-insecure-key" if DEBUG else None
 )
 if not SECRET_KEY:
     raise RuntimeError(
-        "DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is off. "
+        "DJANGO_SECRET_KEY must be set when DEBUG is off. "
         "For local development, copy backend/.env.example to backend/.env."
     )
 
@@ -86,11 +86,11 @@ WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("POSTGRES_DB", "yeticode"),
-        "USER": os.environ.get("POSTGRES_USER", "yeticode"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "yeticode"),
-        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
-        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        "NAME": os.environ.get("DJANGO_DATABASE", "yeticode"),
+        "USER": os.environ.get("DB_USER", "yeticode"),
+        "PASSWORD": os.environ.get("DB_PASSWORD", "yeticode"),
+        "HOST": os.environ.get("DB_HOST", "localhost"),
+        "PORT": os.environ.get("DB_PORT", "5432"),
     }
 }
 
