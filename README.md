@@ -83,6 +83,8 @@ Run the backend tests with `python manage.py test` (needs the `CREATEDB` permiss
 | Dashboards | `/api/auth/me/` returns one dashboard widget per capability; the React app renders them. |
 | Profiles | Everyone has a **My profile** page (user menu): they can upload their own photo and add, change or remove one secondary email. The primary email is the sign-in address; only Super Admins, or unit admins for other people in their unit, can change it, and it can never be blank. When a username was the email, it follows the new email. |
 | Payroll | Academic Content Writing only (`payroll` app). Super Admins, and content-unit roles with `manage_payroll` (Production Manager and HR), set each person's monthly salary and default rates, and record extras per month: words (6,000 words = NPR 1,000 by default, so 3,000 words = NPR 500), hours (8 hours = NPR 1,000), performance and effort. Every amount is optional and the server does the calculation. A **daily log** per person holds each day's extra hours and words (one row per day; empty days had no extra work), and each day is priced on its own, e.g. 2 hours = NPR 250 one day and 12 hours = NPR 1,500 another. Only a Super Admin can change their own pay. |
+| Office hours | Academic Content Writing only (`team` app). Super Admins, and the unit's Production Manager and HR, set each person's shift (presets 7–3, 9–5, 10–6, or custom), work days (Sun–Fri by default) and whether they get reminders. While the app is open, people are reminded 30, 15 and 5 minutes before their shift starts and 5 minutes before log-out time, in the app and as a desktop notification if they allow it. Times use `DJANGO_TIME_ZONE`. |
+| Team chat | Academic Content Writing only. Every active person in the unit sees the whole team, can post in the team room and message anyone in it one to one. Nobody outside the unit can read or send, including Super Admins, and messages are not in the Django admin. The app polls for new messages every few seconds, shows unread badges and profile photos, and notifies about new messages. |
 | Company branding | `CompanySettings` (a single row): name, tagline, contact details and logo. Only Super Admins edit it, on the **Company settings** page. The logo replaces the built-in mark in the sidebar, on the sign-in page and as the tab icon. |
 
 The starting capabilities for each role are in `accounts/rbac.py`. They are
@@ -125,6 +127,11 @@ cards are placeholders for the features each unit will need.
 | `GET /api/payroll/staff/?month=YYYY-MM`, `PATCH /api/payroll/staff/<id>/` | Content staff with salary, rates and the month's totals; set someone's pay setup |
 | `GET/PUT /api/payroll/staff/<id>/daily/?month=YYYY-MM` | A person's daily log: `{"days": [{"date", "hours", "words"}]}`. PUT replaces the month's dated hours/words extras; days left out had none. Unchanged days keep the rate they were priced at. |
 | `GET/POST /api/payroll/extras/?month=YYYY-MM[&staff=<id>]`, `PATCH/DELETE /api/payroll/extras/<id>/` | A month's extras. Words and hours extras are priced from the rate; performance and effort take an amount. |
+| `GET /api/team/office-hours/`, `PUT/DELETE /api/team/office-hours/<id>/` | Content staff shifts (Super Admin, Production Manager, HR) |
+| `GET /api/team/office-hours/me/` | Your own shift and the office time zone, for reminders |
+| `GET /api/chat/contacts/` | Your team, with each conversation's last message and unread count |
+| `GET/POST /api/chat/messages/?with=team\|<id>[&after=<id>]` | Read or send messages in the team room or a one-to-one chat |
+| `POST /api/chat/read/`, `GET /api/chat/updates/?after=<id>` | Mark a conversation read; poll for unread counts and new messages |
 | `GET /api/branding/` | Company name, tagline and logo. Public, for the sign-in page. |
 | `GET/PATCH /api/manage/company/` | Company details and `logo` (Super Admins only) |
 | `GET /api/unit/members/` | People in your unit (needs `view_unit_directory`) |

@@ -3,8 +3,10 @@ import { ArrowRightOutlined, CheckCircleFilled, ClockCircleOutlined } from '@ant
 import { Button, Card, Col, Flex, Progress, Row, Skeleton, Statistic, Tag, Typography } from 'antd'
 import { api } from '../api'
 import { capabilityMeta } from '../capabilities'
+import { MyShift } from '../components/MyShift'
 import { displayName } from '../people'
 import { UNIT_COLORS, unitColor } from '../colors'
+import { inTeam } from '../team'
 
 // Sections that open a real page today; the rest are on the roadmap.
 const LIVE = {
@@ -154,6 +156,7 @@ export default function Dashboard({ user }) {
   return (
     <Flex vertical gap={24}>
       <Hero user={user} />
+      {inTeam(user) && <MyShift />}
       {user.can_manage_users && (
         <section>
           <Typography.Title level={5} className="section-heading">Team at a glance</Typography.Title>

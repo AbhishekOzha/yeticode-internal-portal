@@ -78,3 +78,20 @@ export function fileForm(field, file) {
   data.append(field, file)
   return data
 }
+
+export const teamApi = {
+  officeHours: () => request('/team/office-hours/'),
+  saveOfficeHours: (id, data) => request(`/team/office-hours/${id}/`, { method: 'PUT', body: data }),
+  clearOfficeHours: (id) => request(`/team/office-hours/${id}/`, { method: 'DELETE' }),
+  myOfficeHours: () => request('/team/office-hours/me/'),
+  chatContacts: () => request('/chat/contacts/'),
+  chatMessages: (withId, { after, before } = {}) => {
+    const params = new URLSearchParams({ with: withId })
+    if (after) params.set('after', after)
+    if (before) params.set('before', before)
+    return request(`/chat/messages/?${params}`)
+  },
+  sendChat: (to, body) => request('/chat/messages/', { method: 'POST', body: { to: to === 'team' ? null : Number(to), body } }),
+  markChatRead: (withId, lastId) => request('/chat/read/', { method: 'POST', body: { with: withId, last_id: lastId } }),
+  chatUpdates: (after) => request(`/chat/updates/${after ? `?after=${after}` : ''}`),
+}

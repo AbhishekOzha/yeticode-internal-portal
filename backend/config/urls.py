@@ -11,6 +11,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("accounts.urls")),
     path("api/", include("payroll.urls")),
+    path("api/", include("team.urls")),
 ]
 
 # Uploaded photos and logos in development. static() does nothing unless DEBUG is on.

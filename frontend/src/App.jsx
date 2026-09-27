@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import {
   AppstoreOutlined,
+  ClockCircleOutlined,
   LogoutOutlined,
+  MessageOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   MoonOutlined,
@@ -13,20 +15,25 @@ import {
   UsergroupAddOutlined,
   WalletOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Flex, Layout, Menu, Spin, Tooltip, Typography, Grid } from 'antd'
+import { Badge, Button, Dropdown, Flex, Layout, Menu, Spin, Tooltip, Typography, Grid } from 'antd'
 import { api } from './api'
+import { ChatProvider } from './components/ChatProvider'
 import { Logo } from './components/Logo'
+import { OfficeReminders } from './components/OfficeReminders'
 import { PersonAvatar } from './components/People'
 import { displayName } from './people'
+import Chat from './pages/Chat'
 import CompanySettings from './pages/CompanySettings'
 import Dashboard from './pages/Dashboard'
 import Directory from './pages/Directory'
 import Login from './pages/Login'
+import OfficeHours from './pages/OfficeHours'
 import Payroll from './pages/Payroll'
 import { canManagePayroll } from './payroll'
 import Profile from './pages/Profile'
 import Roles from './pages/Roles'
 import Users from './pages/Users'
+import { canManageOfficeHours, inTeam, useChat } from './team'
 import { useThemeMode } from './themeMode'
 
 const { Sider, Header, Content } = Layout
@@ -39,7 +46,10 @@ function pagesFor(user) {
       ? 'Team directory'
       : null
   if (directory) pages.push({ key: 'directory', label: directory, icon: <TeamOutlined />, Component: Directory })
+  if (inTeam(user)) pages.push({ key: 'chat', label: 'Team chat', icon: <MessageOutlined />, Component: Chat })
   if (user.can_manage_users) pages.push({ key: 'users', label: 'Users', icon: <UsergroupAddOutlined />, Component: Users })
+  if (canManageOfficeHours(user))
+    pages.push({ key: 'office-hours', label: 'Office hours', icon: <ClockCircleOutlined />, Component: OfficeHours })
   if (canManagePayroll(user)) pages.push({ key: 'payroll', label: 'Payroll', icon: <WalletOutlined />, Component: Payroll })
   if (user.can_manage_roles)
     pages.push({ key: 'roles', label: 'Roles & permissions', icon: <SafetyCertificateOutlined />, Component: Roles })
@@ -68,6 +78,7 @@ function scopeLabel(user) {
 
 function Shell({ user, onUserChange, onLogout }) {
   const { dark, toggle } = useThemeMode()
+  const { totalUnread } = useChat()
   const screens = Grid.useBreakpoint()
   const [collapsed, setCollapsed] = useState(false)
   const pages = pagesFor(user)
@@ -80,7 +91,21 @@ function Shell({ user, onUserChange, onLogout }) {
       theme="dark"
       mode="inline"
       selectedKeys={[page.key]}
-      items={pages.filter((p) => !p.hidden).map((p) => ({ key: p.key, icon: p.icon, label: p.label }))}
+      items={pages
+        .filter((p) => !p.hidden)
+        .map((p) => ({
+          key: p.key,
+          icon: p.icon,
+          label:
+            p.key === 'chat' && totalUnread ? (
+              <Flex justify="space-between" align="center">
+                {p.label}
+                <Badge count={totalUnread} size="small" />
+              </Flex>
+            ) : (
+              p.label
+            ),
+        }))}
       onClick={({ key }) => {
         window.location.hash = key
         if (narrow) setCollapsed(true)
@@ -202,5 +227,10 @@ export default function App() {
     )
   }
   if (!user) return <Login onLogin={setUser} />
-  return <Shell user={user} onUserChange={setUser} onLogout={handleLogout} />
+  return (
+    <ChatProvider key={user.id} user={user}>
+      <OfficeReminders user={user} />
+      <Shell user={user} onUserChange={setUser} onLogout={handleLogout} />
+    </ChatProvider>
+  )
 }
