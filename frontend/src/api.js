@@ -65,6 +65,7 @@ export const api = {
   dailyLog: (id, month) => request(`/payroll/staff/${id}/daily/?month=${month}`),
   saveDailyLog: (id, month, days) =>
     request(`/payroll/staff/${id}/daily/?month=${month}`, { method: 'PUT', body: { days } }),
+  payslip: (id, month) => request(`/payroll/staff/${id}/payslip/?month=${month}`),
   payrollExtras: (month) => request(`/payroll/extras/?month=${month}`),
   addPayExtra: (data) => request('/payroll/extras/', { method: 'POST', body: data }),
   deletePayExtra: (id) => request(`/payroll/extras/${id}/`, { method: 'DELETE' }),

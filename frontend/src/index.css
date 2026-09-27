@@ -211,3 +211,19 @@ html[data-theme='dark'] .bell-panel { background: #1b243d; }
 .bell-item.unread { background: rgba(52, 81, 209, 0.05); }
 .bell-icon { font-size: 16px; margin-top: 2px; }
 .bell-dot { width: 8px; height: 8px; border-radius: 50%; background: #3451d1; margin-top: 7px; flex-shrink: 0; }
+
+/* Payslip, in the layout of the company's salary sheet */
+.payslip { width: 100%; border-collapse: collapse; font-size: 14px; }
+.payslip td, .payslip th { border: 1px solid rgba(15, 23, 42, 0.25); padding: 7px 10px; text-align: left; }
+.payslip td:first-child { width: 55%; }
+.payslip tr { background: #fdecec; }
+.payslip-head th { font-size: 17px; font-weight: 700; }
+.payslip-total th { font-size: 18px; font-weight: 800; }
+html[data-theme='dark'] .payslip tr { background: #3a2530; }
+html[data-theme='dark'] .payslip td, html[data-theme='dark'] .payslip th { border-color: rgba(255, 255, 255, 0.2); }
+@media print {
+  body * { visibility: hidden !important; }
+  .payslip-print, .payslip-print * { visibility: visible !important; }
+  .payslip-print { position: fixed; inset: 24px; }
+  .payslip tr { background: #fdecec !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

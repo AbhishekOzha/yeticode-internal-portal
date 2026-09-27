@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarOutlined, DeleteOutlined, LeftOutlined, PlusOutlined, RightOutlined, SettingOutlined } from '@ant-design/icons'
+import { CalendarOutlined, DeleteOutlined, FileTextOutlined, LeftOutlined, PlusOutlined, RightOutlined, SettingOutlined } from '@ant-design/icons'
 import {
   Alert,
   App,
@@ -25,6 +25,7 @@ import {
 } from 'antd'
 import { api } from '../api'
 import DailyLogDrawer from '../components/DailyLogDrawer'
+import { PayslipModal } from '../components/PayslipModal'
 import { PersonCell } from '../components/People'
 import { displayName } from '../people'
 import {
@@ -316,6 +317,7 @@ export default function Payroll({ user }) {
   const [setup, setSetup] = useState(null)
   const [adding, setAdding] = useState(null)
   const [daily, setDaily] = useState(null)
+  const [slip, setSlip] = useState(null)
 
   const load = useCallback(() => {
     Promise.all([api.payrollStaff(month), api.payrollExtras(month)])
@@ -396,12 +398,24 @@ export default function Payroll({ user }) {
           <Typography.Text type="secondary">—</Typography.Text>
         ),
     },
+    {
+      title: 'Leave',
+      key: 'leave',
+      align: 'right',
+      responsive: ['md'],
+      render: (_, r) =>
+        Number(r.leave_days) ? (
+          <Tooltip title={`Approved leave this month · deducted ${npr(r.leave_deduction)}`}>{r.leave_days} d</Tooltip>
+        ) : (
+          <Typography.Text type="secondary">—</Typography.Text>
+        ),
+    },
     { title: 'Total', key: 'total', align: 'right', className: 'nowrap', render: (_, r) => <strong>{npr(r.total)}</strong>, sorter: (a, b) => a.total - b.total },
     {
       title: '',
       key: 'actions',
       align: 'right',
-      width: 260,
+      width: 300,
       render: (_, r) => {
         const own = isOwn(r)
         return (
@@ -420,6 +434,9 @@ export default function Payroll({ user }) {
               <Button size="small" icon={<PlusOutlined />} disabled={own} onClick={() => setAdding(r)}>
                 Extra
               </Button>
+              <Tooltip title="Payslip">
+                <Button size="small" icon={<FileTextOutlined />} onClick={() => setSlip(r)} aria-label={`Payslip for ${displayName(r)}`} />
+              </Tooltip>
               <Tooltip title={own ? undefined : 'Pay setup'}>
                 <Button size="small" icon={<SettingOutlined />} disabled={own} onClick={() => setSetup(r)} aria-label={`Pay setup for ${displayName(r)}`} />
               </Tooltip>
@@ -495,6 +512,7 @@ export default function Payroll({ user }) {
           load()
         }}
       />
+      <PayslipModal staff={slip} month={month} onClose={() => setSlip(null)} />
       <DailyLogDrawer
         key={daily ? `${daily.id}-${month}` : 'closed'}
         staff={daily}

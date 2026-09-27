@@ -22,7 +22,10 @@ from rest_framework.views import APIView
 
 from accounts.serializers import ImageUrlField
 
+from accounts.models import CompanySettings
+
 from .models import MAX_HOURS_PER_DAY, PAYROLL_UNIT, PayExtra, StaffPay, extra_amount
+from .payslip import payslip
 
 User = get_user_model()
 
@@ -102,8 +105,9 @@ def pay_for(user):
         return StaffPay(user=user)
 
 
-def staff_row(user, extras):
+def staff_row(user, extras, month):
     pay = pay_for(user)
+    slip = payslip(user, pay, extras, month)
     by_kind = {kind: Decimal("0") for kind in PayExtra.Kind.values}
     for extra in extras:
         by_kind[extra.kind] += extra.amount
@@ -120,7 +124,10 @@ def staff_row(user, extras):
         "extras_by_kind": {kind: str(amount) for kind, amount in by_kind.items()},
         "extras_count": len(extras),
         "extras_total": str(extras_total),
-        "total": str(salary + extras_total),
+        "leave_days": slip["leave_days"],
+        "leave_deduction": slip["leave_deduction"],
+        # The same gross as the payslip: salary for the days worked, plus all extras.
+        "total": slip["gross"],
     }
 
 
@@ -142,7 +149,7 @@ class StaffPayListView(APIView):
         grouped = extras_by_staff(month, [u.pk for u in staff])
         return Response({
             "month": month.strftime("%Y-%m"),
-            "staff": [staff_row(user, grouped[user.pk]) for user in staff],
+            "staff": [staff_row(user, grouped[user.pk], month) for user in staff],
         })
 
 
@@ -159,7 +166,23 @@ class StaffPayDetailView(APIView):
         serializer.save(user=user)
         user.refresh_from_db()
         month = parse_month(request.query_params.get("month"))
-        return Response(staff_row(user, extras_by_staff(month, [user.pk])[user.pk]))
+        return Response(staff_row(user, extras_by_staff(month, [user.pk])[user.pk], month))
+
+
+class PayslipView(APIView):
+    """GET ?month=YYYY-MM: one person's payslip, in the layout of the company's salary sheet."""
+
+    permission_classes = [CanManagePayroll]
+
+    def get(self, request, pk):
+        user = get_object_or_404(payroll_staff(), pk=pk)
+        month = parse_month(request.query_params.get("month"))
+        extras = extras_by_staff(month, [user.pk])[user.pk]
+        return Response({
+            "company": CompanySettings.load().name,
+            "employee": {"id": user.pk, "name": user.get_full_name() or user.username, "role": user.role.name},
+            **payslip(user, pay_for(user), extras, month),
+        })
 
 
 class PayExtraSerializer(serializers.ModelSerializer):
@@ -324,7 +347,7 @@ class DailyLogView(APIView):
         return Response({
             "month": month.strftime("%Y-%m"),
             "days": rows,
-            "staff": staff_row(user, extras_by_staff(month, [user.pk])[user.pk]),
+            "staff": staff_row(user, extras_by_staff(month, [user.pk])[user.pk], month),
         })
 
     def get(self, request, pk):

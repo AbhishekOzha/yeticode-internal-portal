@@ -243,3 +243,81 @@ class DailyLogTests(PayrollTestCase):
         own = self.client.put(f"/api/payroll/staff/{self.hr.pk}/daily/?month=2026-09", {"days": []}, format="json")
         self.assertEqual(own.status_code, 403)
         self.assertEqual(self.client.get(f"/api/payroll/staff/{self.dev.pk}/daily/").status_code, 404)
+
+
+class PayslipTests(PayrollTestCase):
+    def setUp(self):
+        super().setUp()
+        self.as_user(self.production)
+        StaffPay.objects.create(user=self.writer, monthly_salary=Decimal("25000"))
+
+    def leave(self, start, end, status="approved", half_day=False):
+        from team.models import LeaveRequest
+
+        return LeaveRequest.objects.create(
+            user=self.writer, start_date=start, end_date=end, status=status, half_day=half_day
+        )
+
+    def slip(self, month="2026-05"):
+        response = self.client.get(f"/api/payroll/staff/{self.writer.pk}/payslip/?month={month}")
+        self.assertEqual(response.status_code, 200, response.json())
+        return response.json()
+
+    def test_matches_the_salary_sheet(self):
+        # The sheet: salary 25,000, 2 days' leave in May, 8.33 credits (50,000 words at 6,000 = NPR 1,000).
+        self.leave("2026-05-11", "2026-05-12")
+        self.add_extra(kind="words", quantity="50000", month="2026-05")
+        slip = self.slip()
+        self.assertEqual(slip["per_day"], "834.00")
+        self.assertEqual(slip["total_days"], 30)
+        self.assertEqual(slip["leave_days"], "2")
+        self.assertEqual(slip["working_days"], "28")
+        self.assertEqual(slip["salary_amount"], "23352.00")
+        self.assertEqual(slip["leave_deduction"], "1668.00")
+        self.assertEqual(slip["credits"], "8.33")
+        self.assertEqual(slip["credit_amount"], "8333.33")
+        self.assertEqual(slip["gross"], "31685.33")
+        self.assertEqual(slip["employee"]["name"], "Asha")
+        self.assertEqual(slip["company"], "Yeticode Innovations")
+
+    def test_no_leave_pays_the_full_salary(self):
+        slip = self.slip()
+        self.assertEqual((slip["working_days"], slip["salary_amount"], slip["gross"]), ("30", "25000.00", "25000.00"))
+
+    def test_only_approved_leave_in_the_month_counts(self):
+        self.leave("2026-05-04", "2026-05-04", status="pending")
+        self.leave("2026-05-05", "2026-05-05", status="rejected")
+        self.leave("2026-05-06", "2026-05-06", half_day=True)
+        self.leave("2026-04-29", "2026-05-02")  # 2 of its 4 days are in May
+        slip = self.slip()
+        self.assertEqual(slip["leave_days"], "2.5")
+        self.assertEqual(slip["working_days"], "27.5")
+        self.assertEqual(slip["salary_amount"], "22935.00")  # 27.5 x 834
+        self.assertEqual(self.slip("2026-04")["leave_days"], "2")
+
+    def test_extras_and_bonuses_add_up(self):
+        self.add_extra(kind="hours", quantity="12", month="2026-05")  # 1.5 credits = 1,500
+        self.add_extra(kind="performance", amount="2000", month="2026-05")
+        self.add_extra(kind="effort", amount="500", month="2026-05")
+        slip = self.slip()
+        self.assertEqual((slip["credits"], slip["credit_amount"]), ("1.50", "1500.00"))
+        self.assertEqual((slip["performance"], slip["effort"]), ("2000.00", "500.00"))
+        self.assertEqual(slip["gross"], "29000.00")
+
+    def test_payroll_table_uses_the_payslip_total(self):
+        self.leave("2026-05-11", "2026-05-12")
+        row = next(r for r in self.client.get("/api/payroll/staff/?month=2026-05").json()["staff"] if r["id"] == str(self.writer.pk))
+        self.assertEqual((row["leave_days"], row["total"]), ("2", "23352.00"))
+
+    def test_no_salary_set(self):
+        StaffPay.objects.filter(user=self.writer).update(monthly_salary=None)
+        self.add_extra(kind="words", quantity="6000", month="2026-05")
+        slip = self.slip()
+        self.assertEqual((slip["per_day"], slip["salary_amount"], slip["gross"]), ("0.00", "0.00", "1000.00"))
+
+    def test_only_payroll_managers_see_payslips(self):
+        for user in [self.writer, self.dev, self.web_lead]:
+            self.as_user(user)
+            self.assertEqual(self.client.get(f"/api/payroll/staff/{self.writer.pk}/payslip/").status_code, 403)
+        self.as_user(self.production)
+        self.assertEqual(self.client.get(f"/api/payroll/staff/{self.dev.pk}/payslip/").status_code, 404)
