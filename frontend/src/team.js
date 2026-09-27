@@ -92,6 +92,7 @@ export function nowIn(timeZone) {
 export const ChatContext = createContext({
   enabled: false,
   unread: {},
+  presence: {},
   totalUnread: 0,
   version: 0,
   active: null,
@@ -103,10 +104,35 @@ export function useChat() {
   return useContext(ChatContext)
 }
 
-// 'team' for the team room, otherwise the colleague's id as a string.
+// 'team' for the team room, 'g<id>' for a group, otherwise the colleague's id as a string.
 export function conversationOf(message, meId) {
+  if (message.conversation) return message.conversation
+  if (message.group) return `g${message.group}`
   if (message.recipient === null) return 'team'
   return String(message.sender === meId ? message.recipient : message.sender)
+}
+
+// "Online", or "Last seen 5 min ago" / "Last seen yesterday".
+export function presenceLabel(presence) {
+  if (!presence) return null
+  if (presence.online) return 'Online'
+  if (!presence.last_seen) return null
+  const minutes = Math.round((Date.now() - new Date(presence.last_seen).getTime()) / 60000)
+  if (minutes < 1) return 'Last seen just now'
+  if (minutes < 60) return `Last seen ${minutes} min ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `Last seen ${hours} h ago`
+  const days = Math.round(hours / 24)
+  return days === 1 ? 'Last seen yesterday' : `Last seen ${days} days ago`
+}
+
+// Receipt state of one of your messages: 'sent' (one tick), 'delivered' (two) or 'seen' (two blue).
+export function receiptState(message, receipts) {
+  if (!receipts?.length) return null
+  const seen = receipts.filter((r) => r.read_up_to >= message.id)
+  const delivered = receipts.filter((r) => r.delivered_up_to >= message.id)
+  const state = seen.length === receipts.length ? 'seen' : delivered.length === receipts.length ? 'delivered' : 'sent'
+  return { state, seen, delivered, total: receipts.length }
 }
 
 export function formatDuration(seconds) {

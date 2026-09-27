@@ -74,14 +74,32 @@ def attachment_upload_to(instance, filename):
     return f"chat_files/{uuid.uuid4().hex}.{extension}"
 
 
+class ChatGroup(models.Model):
+    """A group chat within the team, e.g. "Order 4512 writers"."""
+
+    name = models.CharField(max_length=80)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+"
+    )
+    members = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="chat_groups")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class ChatMessage(models.Model):
-    """A message to the whole team (no recipient) or to one colleague."""
+    """A message to the whole team (no recipient or group), one colleague, or a group."""
 
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="chat_sent")
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name="chat_received",
         help_text="Empty for the team room.",
     )
+    group = models.ForeignKey(ChatGroup, on_delete=models.CASCADE, null=True, blank=True, related_name="messages")
     body = models.TextField(max_length=4000, blank=True)
     audio = models.FileField(upload_to=voice_upload_to, storage=private_storage, blank=True)
     audio_duration = models.PositiveIntegerField(null=True, blank=True, help_text="Seconds.")
@@ -99,22 +117,37 @@ class ChatMessage(models.Model):
 
 
 class ChatRead(models.Model):
-    """The last message a person has seen in one conversation (a colleague, or the team room)."""
+    """The last message a person has seen in one conversation: a colleague, a group or the team room."""
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
     peer = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name="+",
-        help_text="Empty for the team room.",
+        help_text="The colleague, for a one-to-one chat.",
     )
+    group = models.ForeignKey(ChatGroup, on_delete=models.CASCADE, null=True, blank=True, related_name="+")
     last_read_id = models.PositiveBigIntegerField(default=0)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["user", "peer"], name="one_read_marker_per_conversation"),
             models.UniqueConstraint(
-                fields=["user"], condition=models.Q(peer__isnull=True), name="one_team_read_marker",
+                fields=["user"], condition=models.Q(peer__isnull=True, group__isnull=True),
+                name="one_team_read_marker",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "group"], condition=models.Q(group__isnull=False), name="one_group_read_marker",
             ),
         ]
+
+
+class ChatPresence(models.Model):
+    """When someone last had the app open, and the newest message their app has fetched (delivered)."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True, related_name="chat_presence"
+    )
+    last_seen = models.DateTimeField()
+    delivered_up_to = models.PositiveBigIntegerField(default=0)
 
 
 class Review(models.Model):

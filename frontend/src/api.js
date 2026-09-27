@@ -91,22 +91,26 @@ export const teamApi = {
     if (before) params.set('before', before)
     return request(`/chat/messages/?${params}`)
   },
-  sendChat: (to, body) => request('/chat/messages/', { method: 'POST', body: { to: to === 'team' ? null : Number(to), body } }),
+  // `to` is a conversation key: 'team', a colleague's id, or 'g<id>' for a group. Sent as-is.
+  sendChat: (to, body) => request('/chat/messages/', { method: 'POST', body: { to: String(to), body } }),
   sendVoice: (to, blob, duration, extension) => {
     const data = new FormData()
-    if (to !== 'team') data.append('to', to)
+    data.append('to', String(to))
     data.append('audio', blob, `voice.${extension}`)
     data.append('duration', String(Math.round(duration)))
     return request('/chat/messages/', { method: 'POST', body: data })
   },
   sendFile: (to, file, body = '') => {
     const data = new FormData()
-    if (to !== 'team') data.append('to', to)
+    data.append('to', String(to))
     data.append('file', file, file.name)
     if (body) data.append('body', body)
     return request('/chat/messages/', { method: 'POST', body: data })
   },
-  markChatRead: (withId, lastId) => request('/chat/read/', { method: 'POST', body: { with: withId, last_id: lastId } }),
+  createGroup: (name, members) => request('/chat/groups/', { method: 'POST', body: { name, members } }),
+  updateGroup: (id, data) => request(`/chat/groups/${id}/`, { method: 'PATCH', body: data }),
+  leaveGroup: (id) => request(`/chat/groups/${id}/leave/`, { method: 'POST' }),
+  markChatRead: (withId, lastId) => request('/chat/read/', { method: 'POST', body: { with: String(withId), last_id: lastId } }),
   reviewPeople: (month) => request(`/team/reviews/people/?month=${month}`),
   writeReview: (data) => request('/team/reviews/', { method: 'POST', body: data }),
   withdrawReview: (id) => request(`/team/reviews/${id}/`, { method: 'DELETE' }),

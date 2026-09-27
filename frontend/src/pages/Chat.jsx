@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftOutlined, PaperClipOutlined, SearchOutlined, SendOutlined, TeamOutlined } from '@ant-design/icons'
-import { App, Avatar, Badge, Button, Card, Empty, Flex, Grid, Input, Skeleton, Tooltip, Typography, Upload } from 'antd'
+import { ArrowLeftOutlined, PaperClipOutlined, PlusOutlined, SearchOutlined, SendOutlined, SettingOutlined } from '@ant-design/icons'
+import { App, Badge, Button, Card, Empty, Flex, Grid, Input, Skeleton, Tooltip, Typography, Upload } from 'antd'
 import { teamApi } from '../api'
 import { NotificationSwitch } from '../components/NotificationSwitch'
 import { ChatAttachment } from '../components/ChatAttachment'
+import { GroupAvatar, GroupModal, OnlineAvatar, Ticks } from '../components/ChatBits'
 import { PersonAvatar } from '../components/People'
 import { VoiceRecorder } from '../components/VoiceRecorder'
 import { displayName } from '../people'
-import { CHAT_FILE_ACCEPT, MAX_CHAT_FILE_BYTES, messageText, useChat } from '../team'
+import { CHAT_FILE_ACCEPT, MAX_CHAT_FILE_BYTES, messageText, presenceLabel, useChat } from '../team'
 
 const POLL_MS = 3000
 const GROUP_GAP_MS = 5 * 60 * 1000
@@ -30,10 +31,6 @@ function preview(message, meId) {
   return `${message.sender === meId ? 'You: ' : ''}${messageText(message)}`
 }
 
-function TeamAvatar({ size = 40 }) {
-  return <Avatar size={size} icon={<TeamOutlined />} style={{ background: '#8b3fd9', flexShrink: 0 }} />
-}
-
 function ContactRow({ selected, avatar, name, subtitle, unread, onClick }) {
   return (
     <button type="button" className={`chat-contact ${selected ? 'selected' : ''}`} onClick={onClick}>
@@ -54,10 +51,13 @@ function ContactRow({ selected, avatar, name, subtitle, unread, onClick }) {
   )
 }
 
-function Conversation({ me, peer, people, onBack, onSent }) {
+// One open conversation: the team room, a colleague (`peer`) or a group.
+function Conversation({ me, target, people, onBack, onSent, onManageGroup }) {
   const { message: toast } = App.useApp()
-  const { setUnread } = useChat()
+  const { setUnread, presence } = useChat()
+  const { peer, group } = target
   const [messages, setMessages] = useState(null)
+  const [receipts, setReceipts] = useState([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [recording, setRecording] = useState(false)
@@ -68,7 +68,7 @@ function Conversation({ me, peer, people, onBack, onSent }) {
   useEffect(() => {
     lastIdRef.current = lastId
   }, [lastId])
-  const withId = peer ? String(peer.id) : 'team'
+  const withId = target.key
 
   // Load the latest messages, then poll for newer ones.
   useEffect(() => {
@@ -76,11 +76,18 @@ function Conversation({ me, peer, people, onBack, onSent }) {
     let timer
     teamApi
       .chatMessages(withId)
-      .then((list) => !stopped && setMessages(list))
+      .then((res) => {
+        if (stopped) return
+        setMessages(res.messages)
+        setReceipts(res.receipts)
+      })
       .catch((err) => toast.error(err.message))
+    // Polling also refreshes the receipts, so ticks turn from ✓ to ✓✓ to blue.
     const tick = async () => {
       try {
-        const newer = await teamApi.chatMessages(withId, { after: lastIdRef.current })
+        const res = await teamApi.chatMessages(withId, { after: lastIdRef.current })
+        const newer = res.messages
+        if (!stopped) setReceipts(res.receipts)
         if (!stopped && newer.length)
           setMessages((current) => {
             const seen = new Set((current ?? []).map((m) => m.id))
@@ -167,22 +174,37 @@ function Conversation({ me, peer, people, onBack, onSent }) {
     }
   }
 
-  const title = peer ? displayName(peer) : 'Content team'
-  const subtitle = peer ? peer.role : `Everyone in Academic Content Writing · ${people.size} people`
+  const title = group ? group.name : peer ? displayName(peer) : 'Content team'
+  const peerPresence = peer ? presence[String(peer.id)] ?? { online: peer.online, last_seen: peer.last_seen } : null
+  const onlineCount = Object.values(presence).filter((p) => p.online).length + 1
+  const subtitle = group
+    ? `${group.member_count} members`
+    : peer
+      ? [peer.role, presenceLabel(peerPresence)].filter(Boolean).join(' · ')
+      : `Everyone in Academic Content Writing · ${people.size} people · ${onlineCount} online`
 
   return (
     <Flex vertical style={{ height: '100%', minHeight: 0 }}>
       <Flex align="center" gap={12} className="chat-header">
         {onBack && <Button type="text" icon={<ArrowLeftOutlined />} onClick={onBack} aria-label="Back to conversations" />}
-        {peer ? <PersonAvatar person={peer} size={40} /> : <TeamAvatar />}
-        <div style={{ minWidth: 0 }}>
+        {peer ? (
+          <OnlineAvatar person={peer} online={peerPresence?.online} />
+        ) : (
+          <GroupAvatar team={!group} />
+        )}
+        <div style={{ minWidth: 0, flex: 1 }}>
           <Typography.Text strong style={{ display: 'block' }} ellipsis>
             {title}
           </Typography.Text>
-          <Typography.Text type="secondary" style={{ fontSize: 13 }} ellipsis>
+          <Typography.Text type="secondary" style={{ fontSize: 13, color: peerPresence?.online ? '#2b8a3e' : undefined }} ellipsis>
             {subtitle}
           </Typography.Text>
         </div>
+        {group && (
+          <Tooltip title={group.can_manage ? 'Rename, add or remove people' : 'Members and leave group'}>
+            <Button icon={<SettingOutlined />} onClick={onManageGroup} aria-label="Group settings" />
+          </Tooltip>
+        )}
       </Flex>
       <div className="chat-messages" ref={listRef}>
         {!messages ? (
@@ -190,7 +212,13 @@ function Conversation({ me, peer, people, onBack, onSent }) {
         ) : messages.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={peer ? `Say hello to ${peer.full_name || displayName(peer)}.` : 'Start the conversation with your team.'}
+            description={
+              peer
+                ? `Say hello to ${peer.full_name || displayName(peer)}.`
+                : group
+                  ? `Start the conversation in ${group.name}.`
+                  : 'Start the conversation with your team.'
+            }
           />
         ) : (
           messages.map((m, i) => {
@@ -222,7 +250,10 @@ function Conversation({ me, peer, people, onBack, onSent }) {
                       {m.audio && <audio controls preload="metadata" src={m.audio} aria-label="Voice message" />}
                       {m.file && <ChatAttachment file={m.file} mine={mine} />}
                       {m.body}
-                      <span className="chat-time">{timeOf(m.created_at)}</span>
+                      <span className="chat-time">
+                        {timeOf(m.created_at)}
+                        {mine && <Ticks message={m} receipts={receipts} />}
+                      </span>
                     </div>
                   </div>
                 </Flex>
@@ -249,7 +280,7 @@ function Conversation({ me, peer, people, onBack, onSent }) {
                 send()
               }
             }}
-            placeholder={`Message ${peer ? displayName(peer) : 'the team'} (Enter to send, Shift+Enter for a new line)`}
+            placeholder={`Message ${title} (Enter to send, Shift+Enter for a new line)`}
             autoSize={{ minRows: 1, maxRows: 5 }}
             maxLength={4000}
             autoFocus
@@ -274,6 +305,7 @@ export default function Chat() {
   const [data, setData] = useState(null)
   const [query, setQuery] = useState('')
   const [showList, setShowList] = useState(true)
+  const [groupModal, setGroupModal] = useState(null) // null, 'new', or the group being edited
   const active = chat.active ?? 'team'
   const narrow = !screens.md
 
@@ -286,6 +318,12 @@ export default function Chat() {
 
   // Reload the list (last messages) whenever the poller sees new messages.
   useEffect(load, [load, chat.version])
+
+  // Also refresh it now and then, so new groups and last-seen times show up.
+  useEffect(() => {
+    const timer = setInterval(load, 20000)
+    return () => clearInterval(timer)
+  }, [load])
 
   // Tell the poller which conversation is on screen, so it doesn't notify about it.
   const { setActive } = chat
@@ -313,7 +351,12 @@ export default function Chat() {
     setShowList(false)
   }
 
-  const peer = active === 'team' ? null : data?.contacts.find((c) => String(c.id) === active)
+  const groups = data?.groups ?? []
+  const shownGroups = groups.filter((g) => g.name.toLowerCase().includes(query.trim().toLowerCase()))
+  const group = active.startsWith('g') ? groups.find((g) => g.key === active) : null
+  const peer = active === 'team' || group ? null : data?.contacts.find((c) => String(c.id) === active)
+  const target = { key: active, peer, group }
+  const onlineOf = (c) => chat.presence[String(c.id)]?.online ?? c.online
 
   const list = (
     <Flex vertical style={{ height: '100%', minHeight: 0 }}>
@@ -329,20 +372,42 @@ export default function Chat() {
           <>
             <ContactRow
               selected={active === 'team'}
-              avatar={<TeamAvatar />}
+              avatar={<GroupAvatar team />}
               name="Content team"
               subtitle={preview(data.team.last_message, data.me.id)}
               unread={chat.unread.team ?? 0}
               onClick={() => open('team')}
             />
-            <Typography.Text type="secondary" className="cap-group-label" style={{ display: 'block', padding: '12px 16px 4px' }}>
-              People · {data.contacts.length}
-            </Typography.Text>
+            <div className="chat-section-row">
+              <Typography.Text type="secondary" className="cap-group-label">
+                Groups · {groups.length}
+              </Typography.Text>
+              <Button size="small" type="text" icon={<PlusOutlined />} onClick={() => setGroupModal('new')}>
+                New group
+              </Button>
+            </div>
+            {shownGroups.map((g) => (
+              <ContactRow
+                key={g.key}
+                selected={active === g.key}
+                avatar={<GroupAvatar />}
+                name={g.name}
+                subtitle={g.last_message ? preview(g.last_message, data.me.id) : `${g.member_count} members`}
+                unread={chat.unread[g.key] ?? 0}
+                onClick={() => open(g.key)}
+              />
+            ))}
+            <div className="chat-section-row">
+              <Typography.Text type="secondary" className="cap-group-label">
+                People · {data.contacts.length} ·{' '}
+                <span style={{ color: '#2b8a3e' }}>{data.contacts.filter(onlineOf).length} online</span>
+              </Typography.Text>
+            </div>
             {contacts.map((c) => (
               <ContactRow
                 key={c.id}
                 selected={active === String(c.id)}
-                avatar={<PersonAvatar person={c} size={40} />}
+                avatar={<OnlineAvatar person={c} online={onlineOf(c)} />}
                 name={displayName(c)}
                 subtitle={c.last_message ? preview(c.last_message, data.me.id) : c.role}
                 unread={chat.unread[String(c.id)] ?? 0}
@@ -356,14 +421,15 @@ export default function Chat() {
   )
 
   const conversation =
-    data && (active === 'team' || peer) ? (
+    data && (active === 'team' || peer || group) ? (
       <Conversation
         key={active}
         me={data.me}
-        peer={peer}
+        target={target}
         people={people}
         onBack={narrow ? () => setShowList(true) : null}
         onSent={load}
+        onManageGroup={() => setGroupModal(group)}
       />
     ) : (
       <Flex align="center" justify="center" style={{ height: '100%' }}>
@@ -379,7 +445,7 @@ export default function Chat() {
             Team chat
           </Typography.Title>
           <Typography.Text type="secondary">
-            For the Academic Content Writing team only. Message the whole team or anyone in it.
+            For the Academic Content Writing team only. Message the whole team, a group, or anyone in it.
           </Typography.Text>
         </div>
         <NotificationSwitch />
@@ -394,6 +460,25 @@ export default function Chat() {
           </div>
         )}
       </Card>
+      {data && (
+        <GroupModal
+          open={Boolean(groupModal)}
+          group={groupModal === 'new' ? null : groupModal}
+          me={data.me}
+          people={data.contacts}
+          onClose={() => setGroupModal(null)}
+          onSaved={(saved) => {
+            setGroupModal(null)
+            load()
+            open(saved.key)
+          }}
+          onLeft={() => {
+            setGroupModal(null)
+            chat.setActive('team')
+            load()
+          }}
+        />
+      )}
     </Flex>
   )
 }

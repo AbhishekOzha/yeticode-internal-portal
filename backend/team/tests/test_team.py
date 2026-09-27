@@ -106,7 +106,7 @@ class OfficeHoursTests(TeamTestCase):
 
 
 class ChatTests(TeamTestCase):
-    def send(self, body, to=None):
+    def send(self, body, to="team"):
         return self.client.post("/api/chat/messages/", {"to": to, "body": body}, format="json")
 
     def test_only_the_content_team_can_chat(self):
@@ -138,12 +138,12 @@ class ChatTests(TeamTestCase):
         self.assertEqual(updates["unread"]["team"], 1)
         self.assertEqual(updates["unread"][str(self.writer.pk)], 1)
         self.assertEqual(updates["total_unread"], 2)
-        direct = self.client.get(f"/api/chat/messages/?with={self.writer.pk}").json()
+        direct = self.client.get(f"/api/chat/messages/?with={self.writer.pk}").json()["messages"]
         self.assertEqual([m["body"] for m in direct], ["Draft is ready"])
 
         # Direct messages stay between the two people.
         self.as_user(self.hr)
-        self.assertEqual(self.client.get(f"/api/chat/messages/?with={self.writer.pk}").json(), [])
+        self.assertEqual(self.client.get(f"/api/chat/messages/?with={self.writer.pk}").json()["messages"], [])
         self.assertEqual(self.client.get("/api/chat/updates/").json()["total_unread"], 1)
 
     def test_read_markers_and_new_message_updates(self):
@@ -296,9 +296,11 @@ class VoiceMessageTests(TeamTestCase):
         shutil.rmtree(PRIVATE_ROOT, ignore_errors=True)
 
     def send_voice(self, to=None, data=WEBM_HEADER, name="voice.webm", duration="7"):
-        payload = {"audio": SimpleUploadedFile(name, data, content_type="audio/webm"), "duration": duration}
-        if to:
-            payload["to"] = to.pk
+        payload = {
+            "audio": SimpleUploadedFile(name, data, content_type="audio/webm"),
+            "duration": duration,
+            "to": to.pk if to else "team",
+        }
         return self.client.post("/api/chat/messages/", payload, format="multipart")
 
     def test_send_and_play_a_direct_voice_message(self):
@@ -358,9 +360,7 @@ def png_bytes():
 @override_settings(PRIVATE_MEDIA_ROOT=PRIVATE_ROOT)
 class ChatFileTests(TeamTestCase):
     def send_file(self, name, data, to=None, body=""):
-        payload = {"file": SimpleUploadedFile(name, data), "body": body}
-        if to:
-            payload["to"] = to.pk
+        payload = {"file": SimpleUploadedFile(name, data), "body": body, "to": to.pk if to else "team"}
         return self.client.post("/api/chat/messages/", payload, format="multipart")
 
     def test_share_documents_in_a_direct_chat(self):
@@ -430,3 +430,176 @@ class ChatFileTests(TeamTestCase):
         self.assertTrue(message.attachment.name.startswith("chat_files/"))
         self.assertTrue(message.attachment.path.startswith(PRIVATE_ROOT))
         self.assertNotIn("..", message.attachment.name)
+
+
+class ReceiptTests(TeamTestCase):
+    def send(self, body, to="team"):
+        return self.client.post("/api/chat/messages/", {"to": to, "body": body}, format="json").json()
+
+    def receipts_for(self, user, with_):
+        self.as_user(user)
+        return {r["id"]: r for r in self.client.get(f"/api/chat/messages/?with={with_}").json()["receipts"]}
+
+    def test_sent_delivered_seen_in_a_direct_chat(self):
+        self.as_user(self.writer)
+        message = self.send("Draft ready", to=self.production.pk)
+        pm = self.receipts_for(self.writer, self.production.pk)[self.production.pk]
+        self.assertLess(pm["delivered_up_to"], message["id"])  # sent: one tick
+        self.assertLess(pm["read_up_to"], message["id"])
+
+        # The Production Manager's app polls: delivered (two ticks), not yet seen.
+        self.as_user(self.production)
+        self.client.get("/api/chat/updates/")
+        pm = self.receipts_for(self.writer, self.production.pk)[self.production.pk]
+        self.assertGreaterEqual(pm["delivered_up_to"], message["id"])
+        self.assertLess(pm["read_up_to"], message["id"])
+
+        # They open the chat: seen (blue ticks).
+        self.as_user(self.production)
+        self.client.post("/api/chat/read/", {"with": self.writer.pk, "last_id": message["id"]}, format="json")
+        pm = self.receipts_for(self.writer, self.production.pk)[self.production.pk]
+        self.assertGreaterEqual(pm["read_up_to"], message["id"])
+
+    def test_team_room_receipts_list_everyone_else(self):
+        self.as_user(self.writer)
+        message = self.send("Morning!")
+        self.as_user(self.hr)
+        self.client.post("/api/chat/read/", {"with": "team", "last_id": message["id"]}, format="json")
+        rows = self.receipts_for(self.writer, "team")
+        self.assertEqual(set(rows), {self.production.pk, self.hr.pk, self.sales.pk})
+        seen = [r["name"] for r in rows.values() if r["read_up_to"] >= message["id"]]
+        self.assertEqual(len(seen), 1)
+
+
+class PresenceTests(TeamTestCase):
+    def test_online_while_the_app_polls(self):
+        self.as_user(self.production)
+        before = self.client.get("/api/chat/contacts/").json()
+        writer = next(c for c in before["contacts"] if c["id"] == self.writer.pk)
+        self.assertFalse(writer["online"])
+        self.assertIsNone(writer["last_seen"])
+
+        self.as_user(self.writer)
+        self.client.get("/api/chat/updates/")
+        self.as_user(self.production)
+        presence = self.client.get("/api/chat/updates/").json()["presence"]
+        self.assertTrue(presence[str(self.writer.pk)]["online"])
+        self.assertNotIn(str(self.production.pk), presence)
+
+    def test_offline_after_a_while(self):
+        import datetime
+
+        from django.utils import timezone
+
+        from team.models import ChatPresence
+
+        ChatPresence.objects.create(user=self.writer, last_seen=timezone.now() - datetime.timedelta(minutes=5))
+        self.as_user(self.production)
+        presence = self.client.get("/api/chat/updates/").json()["presence"][str(self.writer.pk)]
+        self.assertFalse(presence["online"])
+        self.assertIsNotNone(presence["last_seen"])
+
+
+class GroupChatTests(TeamTestCase):
+    def make_group(self, members, name="Order 4512 writers"):
+        return self.client.post("/api/chat/groups/", {"name": name, "members": [m.pk for m in members]}, format="json")
+
+    def test_create_and_chat_in_a_group(self):
+        self.as_user(self.writer)
+        response = self.make_group([self.sales])
+        self.assertEqual(response.status_code, 201, response.json())
+        group = response.json()
+        self.assertEqual(set(group["members"]), {self.writer.pk, self.sales.pk})
+        sent = self.client.post("/api/chat/messages/", {"to": group["key"], "body": "Kick-off"}, format="json")
+        self.assertEqual(sent.status_code, 201, sent.json())
+        self.assertEqual(sent.json()["group"], group["id"])
+
+        self.as_user(self.sales)
+        updates = self.client.get("/api/chat/updates/?after=0").json()
+        self.assertEqual(updates["unread"][group["key"]], 1)
+        self.assertEqual(updates["new"][0]["conversation"], group["key"])
+        self.assertEqual(updates["new"][0]["group_name"], "Order 4512 writers")
+        groups = self.client.get("/api/chat/contacts/").json()["groups"]
+        self.assertEqual([g["name"] for g in groups], ["Order 4512 writers"])
+        # Group messages are not in the team room.
+        self.assertEqual(self.client.get("/api/chat/messages/?with=team").json()["messages"], [])
+
+    def test_only_members_see_a_group(self):
+        self.as_user(self.writer)
+        group = self.make_group([self.sales]).json()
+        self.client.post("/api/chat/messages/", {"to": group["key"], "body": "Secret"}, format="json")
+        message = ChatMessage.objects.get()
+        self.as_user(self.hr)
+        self.assertEqual(self.client.get(f"/api/chat/messages/?with={group['key']}").status_code, 400)
+        self.assertEqual(
+            self.client.post("/api/chat/messages/", {"to": group["key"], "body": "hi"}, format="json").status_code, 400
+        )
+        self.assertEqual(self.client.get("/api/chat/contacts/").json()["groups"], [])
+        self.assertEqual(self.client.get("/api/chat/updates/").json()["total_unread"], 0)
+        self.assertEqual(self.client.get(f"/api/chat/messages/{message.pk}/file/").status_code, 404)
+
+    def test_members_come_from_the_team_only(self):
+        self.as_user(self.writer)
+        self.assertEqual(self.make_group([self.dev]).status_code, 400)
+        self.assertEqual(self.make_group([]).status_code, 400)
+        self.assertEqual(self.make_group([self.sales], name="  ").status_code, 400)
+        self.as_user(self.dev)
+        self.assertEqual(self.make_group([self.writer]).status_code, 403)
+
+    def test_who_manages_a_group(self):
+        self.as_user(self.writer)
+        group = self.make_group([self.sales, self.hr]).json()
+        url = f"/api/chat/groups/{group['id']}/"
+        # A plain member can't change it.
+        self.as_user(self.sales)
+        self.assertEqual(self.client.patch(url, {"name": "Mine now"}, format="json").status_code, 403)
+        # The creator can rename it and add or remove people.
+        self.as_user(self.writer)
+        response = self.client.patch(url, {"name": "Order 4512", "add": [self.production.pk], "remove": [self.hr.pk]}, format="json")
+        self.assertEqual(response.status_code, 200, response.json())
+        self.assertEqual(set(response.json()["members"]), {self.writer.pk, self.sales.pk, self.production.pk})
+        # So can the Production Manager.
+        self.as_user(self.production)
+        response = self.client.patch(url, {"remove": [self.sales.pk]}, format="json")
+        self.assertEqual(response.status_code, 200)
+        # Removed people lose access.
+        self.as_user(self.hr)
+        self.assertEqual(self.client.get(f"/api/chat/messages/?with={group['key']}").status_code, 400)
+
+    def test_leave_a_group(self):
+        self.as_user(self.writer)
+        group = self.make_group([self.sales]).json()
+        self.as_user(self.sales)
+        self.assertEqual(self.client.post(f"/api/chat/groups/{group['id']}/leave/").status_code, 204)
+        self.assertEqual(self.client.get("/api/chat/contacts/").json()["groups"], [])
+
+    def test_group_receipts(self):
+        self.as_user(self.writer)
+        group = self.make_group([self.sales, self.hr]).json()
+        message = self.client.post("/api/chat/messages/", {"to": group["key"], "body": "Hi"}, format="json").json()
+        self.as_user(self.sales)
+        self.client.post("/api/chat/read/", {"with": group["key"], "last_id": message["id"]}, format="json")
+        self.as_user(self.writer)
+        rows = {r["id"]: r for r in self.client.get(f"/api/chat/messages/?with={group['key']}").json()["receipts"]}
+        self.assertEqual(set(rows), {self.sales.pk, self.hr.pk})
+        self.assertGreaterEqual(rows[self.sales.pk]["read_up_to"], message["id"])
+        self.assertLess(rows[self.hr.pk]["read_up_to"], message["id"])
+
+
+class ConversationTargetTests(TeamTestCase):
+    """A message must name its conversation; nothing falls back to the team room by accident."""
+
+    def test_missing_or_garbled_target_is_refused(self):
+        self.as_user(self.writer)
+        for payload in [{"body": "hi"}, {"to": None, "body": "hi"}, {"to": "", "body": "hi"}, {"to": "NaN", "body": "hi"}, {"to": "gx", "body": "hi"}]:
+            response = self.client.post("/api/chat/messages/", payload, format="json")
+            self.assertEqual(response.status_code, 400, payload)
+        self.assertEqual(ChatMessage.objects.count(), 0)
+
+    def test_group_key_as_text_goes_to_the_group(self):
+        self.as_user(self.writer)
+        group = self.client.post("/api/chat/groups/", {"name": "G", "members": [self.sales.pk]}, format="json").json()
+        self.client.post("/api/chat/messages/", {"to": group["key"], "body": "in the group"}, format="json")
+        message = ChatMessage.objects.get()
+        self.assertEqual((message.group_id, message.recipient_id), (group["id"], None))
+        self.assertEqual(self.client.get("/api/chat/messages/?with=team").json()["messages"], [])

@@ -14,6 +14,7 @@ export function ChatProvider({ user, children }) {
   const enabled = inTeam(user)
   const { notification } = App.useApp()
   const [unread, setUnread] = useState({})
+  const [presence, setPresence] = useState({})
   const [version, setVersion] = useState(0)
   const [active, setActive] = useState(null)
   const latestId = useRef(null)
@@ -25,6 +26,7 @@ export function ChatProvider({ user, children }) {
   const poll = useCallback(async () => {
     const updates = await teamApi.chatUpdates(latestId.current)
     setUnread(updates.unread)
+    setPresence(updates.presence ?? {})
     const first = latestId.current === null
     latestId.current = updates.latest_id
     if (first || !updates.new.length) return
@@ -34,7 +36,12 @@ export function ChatProvider({ user, children }) {
       const onScreen = activeRef.current === conversation && document.visibilityState === 'visible'
       if (onScreen) continue
       const sender = message.sender_person
-      const title = conversation === 'team' ? `${displayName(sender)} in Content team` : displayName(sender)
+      const title =
+        conversation === 'team'
+          ? `${displayName(sender)} in Content team`
+          : message.group_name
+            ? `${displayName(sender)} in ${message.group_name}`
+            : displayName(sender)
       const open = () => {
         setActive(conversation)
         window.location.hash = 'chat'
@@ -84,6 +91,7 @@ export function ChatProvider({ user, children }) {
     () => ({
       enabled,
       unread,
+      presence,
       totalUnread: Object.values(unread).reduce((a, b) => a + b, 0),
       version,
       active,
@@ -91,7 +99,7 @@ export function ChatProvider({ user, children }) {
       setUnread,
       refresh: () => poll().catch(() => {}),
     }),
-    [enabled, unread, version, active, poll],
+    [enabled, unread, presence, version, active, poll],
   )
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
 }

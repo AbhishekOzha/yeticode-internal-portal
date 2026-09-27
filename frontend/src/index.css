@@ -183,3 +183,5 @@ html[data-theme='dark'] .chat-composer { border-color: rgba(255, 255, 255, 0.08)
 .chat-file.mine:hover { background: rgba(255, 255, 255, 0.24); }
 html[data-theme='dark'] .chat-file { background: rgba(255, 255, 255, 0.08); }
 .chat-file-icon { font-size: 26px; display: inline-flex; }
+.chat-ticks { display: inline-flex; margin-inline-start: 4px; vertical-align: -1px; }
+.chat-section-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 8px 4px 16px; }
