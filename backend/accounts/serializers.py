@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .dashboard import capabilities_for, dashboard_for
+from .dashboard import can_manage_users, capabilities_for, dashboard_for
 from .models import Role, Unit, User
 
 
@@ -23,12 +23,15 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     is_super_admin = serializers.BooleanField(read_only=True)
     capabilities = serializers.SerializerMethodField()
     dashboard = serializers.SerializerMethodField()
+    can_manage_users = serializers.SerializerMethodField()
+    can_manage_roles = serializers.BooleanField(source="is_superuser", read_only=True)
 
     class Meta:
         model = User
         fields = [
             "id", "username", "full_name", "email", "unit", "role",
             "is_super_admin", "capabilities", "dashboard",
+            "can_manage_users", "can_manage_roles",
         ]
 
     def get_capabilities(self, obj):
@@ -36,6 +39,9 @@ class CurrentUserSerializer(serializers.ModelSerializer):
 
     def get_dashboard(self, obj):
         return dashboard_for(obj)
+
+    def get_can_manage_users(self, obj):
+        return can_manage_users(obj)
 
 
 class MemberSerializer(serializers.ModelSerializer):

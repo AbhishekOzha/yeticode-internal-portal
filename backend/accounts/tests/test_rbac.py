@@ -9,8 +9,11 @@ from accounts.rbac import ROLES, UNITS
 from accounts.models import Role, Unit, User
 
 
-def make_user(role_code, username=None, password="s3cret-pass!"):
-    role = Role.objects.get(code=role_code)
+def make_user(role_code, username=None, password="s3cret-pass!", unit=None):
+    roles = Role.objects.filter(code=role_code)
+    if unit:
+        roles = roles.filter(unit__code=unit)
+    role = roles.get()
     return User.objects.create_user(username=username or role_code, password=password, role=role)
 
 
@@ -150,11 +153,12 @@ class ApiTests(TestCase):
         self.assertNotIn("boss", units)
 
     def test_unit_roles_cannot_see_other_units(self):
-        for role in Role.objects.exclude(unit=None):
-            make_user(role.code)
-        for role in Role.objects.exclude(unit=None):
+        roles = Role.objects.exclude(unit=None).select_related("unit")
+        for role in roles:
+            make_user(role.code, username=f"{role.unit.code}_{role.code}", unit=role.unit.code)
+        for role in roles:
             self.client.logout()
-            self.login(role.code)
+            self.login(f"{role.unit.code}_{role.code}")
             self.assertEqual(
                 self.client.get(reverse("company-members")).status_code, 403, role.code
             )

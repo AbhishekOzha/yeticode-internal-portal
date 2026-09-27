@@ -9,15 +9,31 @@ def capabilities_for(user):
     return [code for code in CAPABILITIES if code in granted]
 
 
+def can_manage_users(user):
+    """Super Admins manage everyone; unit roles with the capability manage their own unit."""
+    if user.is_superuser:
+        return True
+    return (
+        user.is_authenticated
+        and user.unit is not None
+        and user.has_perm("accounts.manage_unit_users")
+    )
+
+
 def dashboard_for(user):
     """The dashboard widgets to show, one per capability the user holds."""
     if user.is_superuser:
         return [
             {
-                "key": "admin_panel",
-                "title": "Administration",
-                "description": "Create accounts and manage units, roles and permissions.",
-            }
+                "key": "manage_users",
+                "title": "Users",
+                "description": "Create accounts, assign roles and deactivate users across all units.",
+            },
+            {
+                "key": "manage_roles",
+                "title": "Roles & permissions",
+                "description": "See every unit's roles and change what each role can do.",
+            },
         ]
     return [
         {"key": code, "title": CAPABILITIES[code][0], "description": CAPABILITIES[code][1]}

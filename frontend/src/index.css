@@ -102,3 +102,54 @@ table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; }
 th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); }
 th { color: var(--muted); font-weight: 500; font-size: 0.85rem; }
 .card.wide { overflow-x: auto; }
+
+select {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+label select { display: block; width: 100%; margin-top: 0.3rem; }
+a { color: var(--accent); }
+
+.tabs { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+.tabs a, .tabs button {
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  border-radius: 6px;
+  padding: 0.45rem 0.8rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+.tabs a.active, .tabs button.active { background: var(--bg); color: var(--text); font-weight: 600; }
+.sub-tabs { margin: 1rem 0 0; }
+.topbar { gap: 1rem; flex-wrap: wrap; }
+
+.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.form { margin: 1rem 0; display: grid; gap: 1rem; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+.form-grid label { font-weight: 500; }
+.checkbox { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 400; cursor: pointer; }
+.checkbox input { width: auto; margin: 0; }
+.checkbox.disabled { color: var(--muted); cursor: not-allowed; }
+.actions { display: flex; gap: 0.75rem; align-items: center; }
+
+.toolbar { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin: 1.25rem 0 0.75rem; }
+.toolbar .search { flex: 1 1 260px; width: auto; margin: 0; }
+.table-card { overflow-x: auto; padding: 0.5rem 1rem; }
+.table-card table { margin-top: 0; }
+tr.inactive td { color: var(--muted); }
+.row-actions { white-space: nowrap; text-align: right; }
+button.link {
+  background: transparent;
+  color: var(--accent);
+  padding: 0.2rem 0.4rem;
+  font-weight: 500;
+}
+
+.role-header { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+.capability-list { list-style: none; padding: 0; margin: 0.75rem 0 1rem; display: grid; gap: 0.4rem; }
+.footnote { margin-top: 2rem; }

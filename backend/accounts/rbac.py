@@ -10,6 +10,7 @@ never overwrites a role that already exists.
 CAPABILITIES = {
     # Shared
     "view_unit_directory": ("Unit directory", "See the people in your unit and their roles."),
+    "manage_unit_users": ("User management", "Add, edit and deactivate accounts in your unit."),
     # Web App Development
     "view_projects": ("Projects", "Browse the unit's active client projects."),
     "work_on_tasks": ("My tasks", "Track the development tasks assigned to you."),
@@ -68,7 +69,7 @@ ROLES = [
      ["view_unit_directory", "view_projects", "work_on_tasks", "review_code"]),
     (WEB, "team_lead", "Team Lead", 4,
      ["view_unit_directory", "view_projects", "work_on_tasks", "review_code",
-      "assign_tasks", "manage_dev_team"]),
+      "assign_tasks", "manage_dev_team", "manage_unit_users"]),
 
     (TRAINING, "student", "Student", 1,
      ["view_unit_directory", "view_courses", "view_own_progress"]),
@@ -78,14 +79,14 @@ ROLES = [
      ["view_unit_directory", "view_courses", "manage_enquiries", "manage_enrollments"]),
     (TRAINING, "training_manager", "Training Manager", 3,
      ["view_unit_directory", "view_courses", "manage_enquiries", "manage_enrollments",
-      "manage_batches", "view_training_reports"]),
+      "manage_batches", "view_training_reports", "manage_unit_users"]),
 
     (CONTENT, "content_writer", "Content Writer", 1,
      ["view_unit_directory", "write_content"]),
     (CONTENT, "content_writer_research_specialist", "Content Writer & Research Specialist", 2,
      ["view_unit_directory", "write_content", "conduct_research"]),
     (CONTENT, "production_manager", "Production Manager", 3,
-     ["view_unit_directory", "review_content", "manage_production"]),
+     ["view_unit_directory", "review_content", "manage_production", "manage_unit_users"]),
     (CONTENT, "sales_executive", "Sales Executive", 1,
      ["view_unit_directory", "manage_leads"]),
     (CONTENT, "sales_manager", "Sales Manager", 2,
@@ -97,9 +98,10 @@ ROLES = [
      ["manage_employee_records", "view_all_employee_records"]),
 ]
 
-# The account `create_default_users` makes for each unit: (username, role code).
-# Each gets the unit's most senior role; like every non-Super Admin account,
-# it has no access to the admin panel.
+# Each unit's admin is its most senior role, which also holds manage_unit_users
+# (accounts in its own unit only). `create_default_users` makes one account per
+# unit with that role: (username, role code). No unit admin can use the
+# Django admin panel.
 UNIT_ADMINS = {
     WEB: ("web_admin", "team_lead"),
     TRAINING: ("training_admin", "training_manager"),
