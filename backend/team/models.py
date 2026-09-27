@@ -188,3 +188,50 @@ class Review(models.Model):
 
     def __str__(self):
         return f"{self.author} on {self.subject} ({self.month:%Y-%m}): {self.rating}/5"
+
+
+class LeaveRequest(models.Model):
+    """A leave application from someone in the team, approved or rejected by the Production Manager or HR."""
+
+    class Kind(models.TextChoices):
+        CASUAL = "casual", "Casual leave"
+        SICK = "sick", "Sick leave"
+        ANNUAL = "annual", "Annual leave"
+        UNPAID = "unpaid", "Unpaid leave"
+        OTHER = "other", "Other"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        CANCELLED = "cancelled", "Cancelled"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="leave_requests")
+    kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.CASUAL)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    half_day = models.BooleanField(default=False, help_text="Only for a single day.")
+    reason = models.TextField(max_length=1000, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-start_date", "-created_at"]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(end_date__gte=models.F("start_date")), name="leave_ends_after_start"),
+        ]
+
+    def __str__(self):
+        return f"{self.user}: {self.get_kind_display()} {self.start_date}–{self.end_date} ({self.status})"
+
+    @property
+    def days(self):
+        if self.half_day:
+            return 0.5
+        return (self.end_date - self.start_date).days + 1

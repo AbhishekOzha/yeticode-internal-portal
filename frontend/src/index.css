@@ -194,3 +194,20 @@ html[data-theme='dark'] .chat-receipt-label.seen { color: #4ade80; }
 /* "Academic Content Writing / Payroll" in the header */
 .header-section { font-weight: 500; font-size: inherit; }
 @media (max-width: 640px) { .header-section { display: none; } }
+
+/* Notification bell */
+.bell-panel {
+  width: 360px; max-width: calc(100vw - 24px); background: var(--ant-color-bg-elevated, #fff);
+  border-radius: 12px; box-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.35); overflow: hidden;
+}
+html[data-theme='dark'] .bell-panel { background: #1b243d; }
+.bell-panel-head { padding: 12px 14px; border-bottom: 1px solid rgba(15, 23, 42, 0.08); }
+.bell-list { max-height: 420px; overflow-y: auto; }
+.bell-item {
+  display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left;
+  padding: 10px 14px; border: 0; background: transparent; cursor: pointer; font: inherit; color: inherit;
+}
+.bell-item:hover { background: rgba(52, 81, 209, 0.06); }
+.bell-item.unread { background: rgba(52, 81, 209, 0.05); }
+.bell-icon { font-size: 16px; margin-top: 2px; }
+.bell-dot { width: 8px; height: 8px; border-radius: 50%; background: #3451d1; margin-top: 7px; flex-shrink: 0; }

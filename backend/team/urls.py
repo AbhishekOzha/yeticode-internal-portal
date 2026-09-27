@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import chat, reviews, views
+from . import chat, leave, reviews, views
 
 urlpatterns = [
     path("team/office-hours/", views.OfficeHoursListView.as_view(), name="office-hours"),
@@ -19,4 +19,8 @@ urlpatterns = [
     path("team/reviews/people/", reviews.ReviewPeopleView.as_view(), name="review-people"),
     path("team/reviews/summary/", reviews.ReviewSummaryView.as_view(), name="review-summary"),
     path("team/reviews/<uuid:pk>/", reviews.ReviewDeleteView.as_view(), name="review-detail"),
+    path("team/leave/", leave.MyLeaveView.as_view(), name="leave"),
+    path("team/leave/requests/", leave.TeamLeaveView.as_view(), name="leave-requests"),
+    path("team/leave/<uuid:pk>/cancel/", leave.CancelLeaveView.as_view(), name="leave-cancel"),
+    path("team/leave/<uuid:pk>/decide/", leave.DecideLeaveView.as_view(), name="leave-decide"),
 ]

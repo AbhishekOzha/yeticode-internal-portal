@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   AppstoreOutlined,
+  CalendarOutlined,
   ClockCircleOutlined,
   FileTextOutlined,
   LogoutOutlined,
@@ -21,6 +22,7 @@ import { Badge, Button, Dropdown, Flex, Layout, Menu, Spin, Tooltip, Typography,
 import { api } from './api'
 import { ChatProvider } from './components/ChatProvider'
 import { Logo } from './components/Logo'
+import { NotificationBell } from './components/NotificationBell'
 import { OfficeReminders } from './components/OfficeReminders'
 import { PersonAvatar } from './components/People'
 import { displayName } from './people'
@@ -28,6 +30,7 @@ import Chat from './pages/Chat'
 import CompanySettings from './pages/CompanySettings'
 import Dashboard from './pages/Dashboard'
 import Directory from './pages/Directory'
+import Leave from './pages/Leave'
 import Login from './pages/Login'
 import OfficeHours from './pages/OfficeHours'
 import Payroll from './pages/Payroll'
@@ -36,7 +39,7 @@ import Profile from './pages/Profile'
 import Reviews from './pages/Reviews'
 import Roles from './pages/Roles'
 import Users from './pages/Users'
-import { canManageOfficeHours, canReadReviews, inTeam, useChat } from './team'
+import { canApproveLeave, canManageOfficeHours, canReadReviews, inTeam, useChat } from './team'
 import { useThemeMode } from './themeMode'
 
 const { Sider, Header, Content } = Layout
@@ -60,6 +63,8 @@ function pagesFor(user) {
     pages.push({ key: 'company', label: 'Company settings', icon: <SettingOutlined />, Component: CompanySettings })
   const content = CONTENT_SECTION
   if (inTeam(user)) pages.push({ key: 'chat', label: 'Team chat', icon: <MessageOutlined />, Component: Chat, section: content })
+  if (inTeam(user) || canApproveLeave(user))
+    pages.push({ key: 'leave', label: 'Leave', icon: <CalendarOutlined />, Component: Leave, section: content })
   if (inTeam(user) || canReadReviews(user))
     pages.push({ key: 'reviews', label: 'Reviews', icon: <StarOutlined />, Component: Reviews, section: content })
   if (canManageOfficeHours(user))
@@ -207,6 +212,7 @@ function Shell({ user, onUserChange, onLogout }) {
             </Typography.Title>
           </Flex>
           <Flex align="center" gap={8}>
+            <NotificationBell />
             <Tooltip title={dark ? 'Light mode' : 'Dark mode'}>
               <Button type="text" shape="circle" aria-label="Toggle theme" icon={dark ? <SunOutlined /> : <MoonOutlined />} onClick={toggle} />
             </Tooltip>

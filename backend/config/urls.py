@@ -12,6 +12,7 @@ urlpatterns = [
     path("api/", include("accounts.urls")),
     path("api/", include("payroll.urls")),
     path("api/", include("team.urls")),
+    path("api/", include("notifications.urls")),
 ]
 
 # Uploaded photos and logos in development. static() does nothing unless DEBUG is on.

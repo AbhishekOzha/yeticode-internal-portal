@@ -20,6 +20,11 @@ export function canReadReviews(user) {
   )
 }
 
+// The unit's Production Manager and HR (and Super Admins) decide leave requests.
+export function canApproveLeave(user) {
+  return canReadReviews(user)
+}
+
 // Python weekday numbers: Monday = 0. Listed Sunday first, as the office week starts on Sunday.
 export const WEEKDAYS = [
   { value: 6, label: 'Sun' },

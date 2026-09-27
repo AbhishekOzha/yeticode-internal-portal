@@ -117,3 +117,16 @@ export const teamApi = {
   reviewSummary: (month) => request(`/team/reviews/summary/?month=${month}`),
   chatUpdates: (after) => request(`/chat/updates/${after ? `?after=${after}` : ''}`),
 }
+
+export const notificationsApi = {
+  list: () => request('/notifications/'),
+  markRead: (ids) => request('/notifications/read/', { method: 'POST', body: ids ? { ids } : {} }),
+}
+
+export const leaveApi = {
+  mine: () => request('/team/leave/'),
+  apply: (data) => request('/team/leave/', { method: 'POST', body: data }),
+  cancel: (id) => request(`/team/leave/${id}/cancel/`, { method: 'POST' }),
+  team: (status) => request(`/team/leave/requests/?status=${status}`),
+  decide: (id, decision, note) => request(`/team/leave/${id}/decide/`, { method: 'POST', body: { decision, note } }),
+}
