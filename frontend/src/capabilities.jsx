@@ -1,5 +1,6 @@
 import {
   AuditOutlined,
+  WalletOutlined,
   BarChartOutlined,
   BookOutlined,
   CalendarOutlined,
@@ -55,6 +56,7 @@ export const CAPABILITY_META = {
   manage_sales_team: { icon: FundOutlined, color: '#c2255c' },
   manage_employee_records: { icon: IdcardOutlined, color: '#c47f00' },
   view_all_employee_records: { icon: GlobalOutlined, color: '#c47f00' },
+  manage_payroll: { icon: WalletOutlined, color: '#2b8a3e' },
 }
 
 export function capabilityMeta(key) {

@@ -35,6 +35,10 @@ CAPABILITIES = {
     "view_sales_reports": ("Sales reports", "Revenue and conversion reports for the sales team."),
     "manage_sales_team": ("Sales team", "Targets and performance of sales executives."),
     "manage_employee_records": ("Employee records", "Staff records, onboarding and leave."),
+    "manage_payroll": (
+        "Staff payroll",
+        "Monthly salaries and extra pay (words, hours, performance, effort) for content writing staff.",
+    ),
     # Company-wide (only for roles that are not tied to a unit)
     "view_all_employee_records": (
         "Company-wide employee records",
@@ -66,6 +70,7 @@ CAPABILITY_GROUPS = {
     "manage_leads": "Academic Content Writing",
     "view_sales_reports": "Academic Content Writing",
     "manage_sales_team": "Academic Content Writing",
+    "manage_payroll": "Academic Content Writing",
     "manage_employee_records": "HR",
     "view_all_employee_records": "HR",
 }
@@ -114,13 +119,14 @@ ROLES = [
     (CONTENT, "content_writer_research_specialist", "Content Writer & Research Specialist", 2,
      ["view_unit_directory", "write_content", "conduct_research"]),
     (CONTENT, "production_manager", "Production Manager", 3,
-     ["view_unit_directory", "review_content", "manage_production", "manage_unit_users"]),
+     ["view_unit_directory", "review_content", "manage_production", "manage_unit_users",
+      "manage_payroll"]),
     (CONTENT, "sales_executive", "Sales Executive", 1,
      ["view_unit_directory", "manage_leads"]),
     (CONTENT, "sales_manager", "Sales Manager", 2,
      ["view_unit_directory", "manage_leads", "view_sales_reports", "manage_sales_team"]),
     (CONTENT, "hr", "HR", 2,
-     ["view_unit_directory", "manage_employee_records"]),
+     ["view_unit_directory", "manage_employee_records", "manage_payroll"]),
 
     (COMPANY_WIDE, "head_hr", "Head HR", 1,
      ["manage_employee_records", "view_all_employee_records"]),

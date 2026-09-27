@@ -34,6 +34,11 @@ def dashboard_for(user):
                 "title": "Roles & permissions",
                 "description": "See every unit's roles and change what each role can do.",
             },
+            {
+                "key": "manage_payroll",
+                "title": CAPABILITIES["manage_payroll"][0],
+                "description": CAPABILITIES["manage_payroll"][1],
+            },
         ]
     return [
         {"key": code, "title": CAPABILITIES[code][0], "description": CAPABILITIES[code][1]}

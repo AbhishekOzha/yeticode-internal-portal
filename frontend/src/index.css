@@ -126,3 +126,7 @@ html[data-theme='dark'] .app-header { border-bottom-color: rgba(255, 255, 255, 0
 
 /* Company settings: the logo as it appears in the sidebar */
 .brand-preview { padding: 16px 20px; border-radius: 12px; background: #0f1733; }
+
+/* Payroll */
+.nowrap { white-space: nowrap; }
+.payroll-stat .ant-statistic-content { white-space: nowrap; font-size: 22px; }

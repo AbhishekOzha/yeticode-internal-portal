@@ -11,6 +11,7 @@ import {
   TeamOutlined,
   UserOutlined,
   UsergroupAddOutlined,
+  WalletOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Flex, Layout, Menu, Spin, Tooltip, Typography, Grid } from 'antd'
 import { api } from './api'
@@ -21,6 +22,8 @@ import CompanySettings from './pages/CompanySettings'
 import Dashboard from './pages/Dashboard'
 import Directory from './pages/Directory'
 import Login from './pages/Login'
+import Payroll from './pages/Payroll'
+import { canManagePayroll } from './payroll'
 import Profile from './pages/Profile'
 import Roles from './pages/Roles'
 import Users from './pages/Users'
@@ -37,6 +40,7 @@ function pagesFor(user) {
       : null
   if (directory) pages.push({ key: 'directory', label: directory, icon: <TeamOutlined />, Component: Directory })
   if (user.can_manage_users) pages.push({ key: 'users', label: 'Users', icon: <UsergroupAddOutlined />, Component: Users })
+  if (canManagePayroll(user)) pages.push({ key: 'payroll', label: 'Payroll', icon: <WalletOutlined />, Component: Payroll })
   if (user.can_manage_roles)
     pages.push({ key: 'roles', label: 'Roles & permissions', icon: <SafetyCertificateOutlined />, Component: Roles })
   if (user.is_super_admin)

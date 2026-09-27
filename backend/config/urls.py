@@ -10,6 +10,7 @@ admin.site.index_title = "Users, units and roles"
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("accounts.urls")),
+    path("api/", include("payroll.urls")),
 ]
 
 # Uploaded photos and logos in development. static() does nothing unless DEBUG is on.

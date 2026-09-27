@@ -13,6 +13,7 @@ const LIVE = {
   manage_unit_users: 'users',
   manage_users: 'users',
   manage_roles: 'roles',
+  manage_payroll: 'payroll',
 }
 
 function greeting() {
