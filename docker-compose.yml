@@ -1,0 +1,15 @@
+# Local PostgreSQL for development. Matches the defaults in backend/config/settings.py.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: yeticode
+      POSTGRES_USER: yeticode
+      POSTGRES_PASSWORD: yeticode
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
