@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   AppstoreOutlined,
   ClockCircleOutlined,
+  FileTextOutlined,
   LogoutOutlined,
   MessageOutlined,
   MenuFoldOutlined,
@@ -40,6 +41,10 @@ import { useThemeMode } from './themeMode'
 
 const { Sider, Header, Content } = Layout
 
+// Pages that belong to one unit are grouped under it in the sidebar, so they
+// don't read as company-wide.
+const CONTENT_SECTION = { key: 'section-content', label: 'Academic Content Writing', icon: <FileTextOutlined /> }
+
 function pagesFor(user) {
   const pages = [{ key: 'dashboard', label: 'Dashboard', icon: <AppstoreOutlined />, Component: Dashboard }]
   const directory = user.capabilities.includes('view_all_employee_records')
@@ -48,20 +53,70 @@ function pagesFor(user) {
       ? 'Team directory'
       : null
   if (directory) pages.push({ key: 'directory', label: directory, icon: <TeamOutlined />, Component: Directory })
-  if (inTeam(user)) pages.push({ key: 'chat', label: 'Team chat', icon: <MessageOutlined />, Component: Chat })
   if (user.can_manage_users) pages.push({ key: 'users', label: 'Users', icon: <UsergroupAddOutlined />, Component: Users })
-  if (inTeam(user) || canReadReviews(user))
-    pages.push({ key: 'reviews', label: 'Reviews', icon: <StarOutlined />, Component: Reviews })
-  if (canManageOfficeHours(user))
-    pages.push({ key: 'office-hours', label: 'Office hours', icon: <ClockCircleOutlined />, Component: OfficeHours })
-  if (canManagePayroll(user)) pages.push({ key: 'payroll', label: 'Payroll', icon: <WalletOutlined />, Component: Payroll })
   if (user.can_manage_roles)
     pages.push({ key: 'roles', label: 'Roles & permissions', icon: <SafetyCertificateOutlined />, Component: Roles })
   if (user.is_super_admin)
     pages.push({ key: 'company', label: 'Company settings', icon: <SettingOutlined />, Component: CompanySettings })
+  const content = CONTENT_SECTION
+  if (inTeam(user)) pages.push({ key: 'chat', label: 'Team chat', icon: <MessageOutlined />, Component: Chat, section: content })
+  if (inTeam(user) || canReadReviews(user))
+    pages.push({ key: 'reviews', label: 'Reviews', icon: <StarOutlined />, Component: Reviews, section: content })
+  if (canManageOfficeHours(user))
+    pages.push({
+      key: 'office-hours',
+      label: 'Office hours',
+      icon: <ClockCircleOutlined />,
+      Component: OfficeHours,
+      section: content,
+    })
+  if (canManagePayroll(user))
+    pages.push({ key: 'payroll', label: 'Payroll', icon: <WalletOutlined />, Component: Payroll, section: content })
   // Reached from the user menu rather than the sidebar.
   pages.push({ key: 'profile', label: 'My profile', icon: <UserOutlined />, Component: Profile, hidden: true })
   return pages
+}
+
+// Sidebar items: top-level pages, with each unit's pages nested under the unit's name.
+function menuItems(pages, totalUnread) {
+  const item = (p) => ({
+    key: p.key,
+    icon: p.icon,
+    label:
+      p.key === 'chat' && totalUnread ? (
+        <Flex justify="space-between" align="center">
+          {p.label}
+          <Badge count={totalUnread} size="small" />
+        </Flex>
+      ) : (
+        p.label
+      ),
+  })
+  const items = []
+  for (const p of pages.filter((x) => !x.hidden)) {
+    if (!p.section) {
+      items.push(item(p))
+      continue
+    }
+    let group = items.find((i) => i.key === p.section.key)
+    if (!group) {
+      group = { key: p.section.key, icon: p.section.icon, label: p.section.label, children: [] }
+      items.push(group)
+    }
+    group.children.push(item(p))
+  }
+  // Show unread chat messages on the section too, so they're visible when it's folded.
+  for (const group of items.filter((i) => i.children)) {
+    if (totalUnread && group.children.some((c) => c.key === 'chat')) {
+      group.label = (
+        <Flex justify="space-between" align="center">
+          {group.label}
+          <Badge count={totalUnread} size="small" />
+        </Flex>
+      )
+    }
+  }
+  return items
 }
 
 function useHashPage() {
@@ -95,21 +150,8 @@ function Shell({ user, onUserChange, onLogout }) {
       theme="dark"
       mode="inline"
       selectedKeys={[page.key]}
-      items={pages
-        .filter((p) => !p.hidden)
-        .map((p) => ({
-          key: p.key,
-          icon: p.icon,
-          label:
-            p.key === 'chat' && totalUnread ? (
-              <Flex justify="space-between" align="center">
-                {p.label}
-                <Badge count={totalUnread} size="small" />
-              </Flex>
-            ) : (
-              p.label
-            ),
-        }))}
+      defaultOpenKeys={[CONTENT_SECTION.key]}
+      items={menuItems(pages, totalUnread)}
       onClick={({ key }) => {
         window.location.hash = key
         if (narrow) setCollapsed(true)
@@ -156,6 +198,11 @@ function Shell({ user, onUserChange, onLogout }) {
               onClick={() => setCollapsed((c) => !c)}
             />
             <Typography.Title level={4} style={{ margin: 0 }}>
+              {page.section && (
+                <Typography.Text type="secondary" className="header-section">
+                  {page.section.label} /{' '}
+                </Typography.Text>
+              )}
               {page.label}
             </Typography.Title>
           </Flex>

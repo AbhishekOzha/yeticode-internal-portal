@@ -190,3 +190,7 @@ html[data-theme='dark'] .chat-file { background: rgba(255, 255, 255, 0.08); }
 .chat-receipt-label.seen { color: #2b8a3e; opacity: 1; font-weight: 600; }
 html[data-theme='dark'] .chat-receipt-label.seen { color: #4ade80; }
 .chat-section-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 8px 4px 16px; }
+
+/* "Academic Content Writing / Payroll" in the header */
+.header-section { font-weight: 500; font-size: inherit; }
+@media (max-width: 640px) { .header-section { display: none; } }
