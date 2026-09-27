@@ -155,7 +155,7 @@ class PayTests(PayrollTestCase):
         self.add_extra(kind="effort", amount="700", month="2026-10")
 
         rows = self.client.get("/api/payroll/staff/?month=2026-09").json()["staff"]
-        row = next(r for r in rows if r["id"] == self.writer.pk)
+        row = next(r for r in rows if r["id"] == str(self.writer.pk))
         self.assertEqual(row["extras_by_kind"]["words"], "2000.00")
         self.assertEqual(row["extras_total"], "2500.00")
         self.assertEqual(row["total"], "22500.00")

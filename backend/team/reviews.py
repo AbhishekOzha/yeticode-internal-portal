@@ -58,7 +58,7 @@ def review_data(review):
 
 
 class ReviewInputSerializer(serializers.Serializer):
-    subject = serializers.IntegerField()
+    subject = serializers.UUIDField()
     month = serializers.CharField(required=False, allow_blank=True)
     rating = serializers.IntegerField(min_value=1, max_value=5)
     comment = serializers.CharField(required=False, allow_blank=True, max_length=2000)

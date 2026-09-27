@@ -6,6 +6,7 @@ record their monthly extras. Only a Super Admin can change their own pay.
 """
 
 import datetime
+import uuid
 from collections import defaultdict
 from decimal import Decimal
 
@@ -268,7 +269,10 @@ class PayExtraViewSet(
         if self.action == "list":
             extras = extras.filter(month=parse_month(self.request.query_params.get("month")))
             if staff := self.request.query_params.get("staff"):
-                extras = extras.filter(staff_id=staff)
+                try:
+                    extras = extras.filter(staff_id=uuid.UUID(staff))
+                except ValueError:
+                    raise ValidationError({"staff": "That isn't a valid id."})
         return extras
 
     def perform_create(self, serializer):

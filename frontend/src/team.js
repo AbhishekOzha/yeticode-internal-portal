@@ -129,8 +129,8 @@ export function presenceLabel(presence) {
 // Receipt state of one of your messages: 'sent' (one tick), 'delivered' (two) or 'seen' (two blue).
 export function receiptState(message, receipts) {
   if (!receipts?.length) return null
-  const seen = receipts.filter((r) => r.read_up_to >= message.id)
-  const delivered = receipts.filter((r) => r.delivered_up_to >= message.id)
+  const seen = receipts.filter((r) => r.read_up_to >= message.seq)
+  const delivered = receipts.filter((r) => r.delivered_up_to >= message.seq)
   const state = seen.length === receipts.length ? 'seen' : delivered.length === receipts.length ? 'delivered' : 'sent'
   return { state, seen, delivered, total: receipts.length }
 }

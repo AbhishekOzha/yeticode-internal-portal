@@ -11,6 +11,7 @@ means they opened the conversation. The same polling records who is online.
 """
 
 import datetime
+import uuid
 from dataclasses import dataclass
 
 from django.contrib.auth import get_user_model
@@ -95,16 +96,31 @@ def resolve(me, value, required=False):
         return Conversation("team")
     if value in ("", "null", "NaN", "undefined"):
         raise ValidationError({"to": "Say which conversation this is for: 'team', a colleague's id or 'g<id>'."})
-    if value.startswith("g") and value[1:].isdigit():
-        group = my_groups(me).filter(pk=int(value[1:])).first()
+    if value.startswith("g"):
+        group_id = parse_uuid(value[1:], "with")
+        group = my_groups(me).filter(pk=group_id).first()
         if group is None:
             raise ValidationError({"with": "You're not in that group."})
-        return Conversation(value, group=group)
-    try:
-        peer = team_members().exclude(pk=me.pk).get(pk=int(value))
-    except (User.DoesNotExist, ValueError, TypeError):
+        return Conversation(f"g{group.pk}", group=group)
+    peer = team_members().exclude(pk=me.pk).filter(pk=parse_uuid(value, "with")).first()
+    if peer is None:
         raise ValidationError({"with": "You can only chat with your own team."})
     return Conversation(str(peer.pk), peer=peer)
+
+
+def parse_uuid(value, field):
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, TypeError, AttributeError):
+        raise ValidationError({field: "That isn't a valid id."})
+
+
+def parse_seq(value, field):
+    """Message positions (`seq`) are whole numbers; ids are UUIDs."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        raise ValidationError({field: "Use a message's seq number."})
 
 
 def visible_to(me):
@@ -125,6 +141,8 @@ def conversation_key(message, me):
 def message_data(message):
     return {
         "id": message.pk,
+        # Increasing position in the chat; used for "newer than", unread, delivered and seen.
+        "seq": message.seq,
         "sender": message.sender_id,
         "recipient": message.recipient_id,
         "group": message.group_id,
@@ -187,7 +205,7 @@ def receipts(conversation, me):
     rows = []
     for user in others:
         lookup = conversation.marker_for(user, me)
-        read = ChatRead.objects.filter(**lookup).values_list("last_read_id", flat=True).first() or 0
+        read = ChatRead.objects.filter(**lookup).values_list("last_read_seq", flat=True).first() or 0
         rows.append({
             "id": user.pk,
             "name": user.get_full_name() or user.username,
@@ -198,38 +216,38 @@ def receipts(conversation, me):
     return rows
 
 
-def mark_read(conversation, me, last_id):
+def mark_read(conversation, me, last_seq):
     marker, _ = ChatRead.objects.get_or_create(**conversation.marker_for(me, me))
-    if last_id > marker.last_read_id:
-        marker.last_read_id = last_id
-        marker.save(update_fields=["last_read_id"])
+    if last_seq > marker.last_read_seq:
+        marker.last_read_seq = last_seq
+        marker.save(update_fields=["last_read_seq"])
 
 
 def unread_counts(me):
     """Unread messages per conversation key: {"team": n, "<colleague id>": n, "g<group id>": n}."""
     markers = ChatRead.objects.filter(user=me)
     team_read = (
-        markers.filter(peer__isnull=True, group__isnull=True).values_list("last_read_id", flat=True).first() or 0
+        markers.filter(peer__isnull=True, group__isnull=True).values_list("last_read_seq", flat=True).first() or 0
     )
     counts = {
-        "team": ChatMessage.objects.filter(TEAM_ROOM, id__gt=team_read).exclude(sender=me).count()
+        "team": ChatMessage.objects.filter(TEAM_ROOM, seq__gt=team_read).exclude(sender=me).count()
     }
-    direct_marker = markers.filter(peer=OuterRef("sender")).values("last_read_id")[:1]
+    direct_marker = markers.filter(peer=OuterRef("sender")).values("last_read_seq")[:1]
     direct = (
         ChatMessage.objects.filter(recipient=me, sender__in=team_members())
         .annotate(read_up_to=Coalesce(Subquery(direct_marker), Value(0)))
-        .filter(id__gt=F("read_up_to"))
+        .filter(seq__gt=F("read_up_to"))
         .values("sender")
         .annotate(n=Count("id"))
     )
     for row in direct:
         counts[str(row["sender"])] = row["n"]
-    group_marker = markers.filter(group=OuterRef("group")).values("last_read_id")[:1]
+    group_marker = markers.filter(group=OuterRef("group")).values("last_read_seq")[:1]
     grouped = (
         ChatMessage.objects.filter(group__in=my_groups(me))
         .exclude(sender=me)
         .annotate(read_up_to=Coalesce(Subquery(group_marker), Value(0)))
-        .filter(id__gt=F("read_up_to"))
+        .filter(seq__gt=F("read_up_to"))
         .values("group")
         .annotate(n=Count("id"))
     )
@@ -262,10 +280,7 @@ def group_data(group, me, unread=None, last=None):
 
 def team_ids(values, me):
     """Validate a list of teammate ids."""
-    try:
-        ids = {int(v) for v in values or []}
-    except (TypeError, ValueError):
-        raise ValidationError({"members": "Use teammates' ids."})
+    ids = {parse_uuid(v, "members") for v in values or []}
     found = set(team_members().filter(pk__in=ids).values_list("pk", flat=True))
     if ids - found:
         raise ValidationError({"members": "Groups can only include people in your own team."})
@@ -346,7 +361,7 @@ class ChatContactsView(APIView):
         for member in members:
             if member.pk == me.pk:
                 continue
-            last = Conversation(str(member.pk), peer=member).messages(me).order_by("-id").first()
+            last = Conversation(str(member.pk), peer=member).messages(me).order_by("-seq").first()
             contacts.append({
                 **person(member),
                 **online[str(member.pk)],
@@ -354,9 +369,9 @@ class ChatContactsView(APIView):
                 "last_message": message_data(last) if last else None,
             })
         groups = [
-            group_data(g, me, unread, g.messages.order_by("-id").first()) for g in my_groups(me)
+            group_data(g, me, unread, g.messages.order_by("-seq").first()) for g in my_groups(me)
         ]
-        last_team = ChatMessage.objects.filter(TEAM_ROOM).order_by("-id").first()
+        last_team = ChatMessage.objects.filter(TEAM_ROOM).order_by("-seq").first()
         return Response({
             "me": person(me),
             "team": {
@@ -371,7 +386,7 @@ class ChatContactsView(APIView):
 
 
 class ChatMessagesView(APIView):
-    """GET ?with=team|<id>|g<id>[&after=<id>|&before=<id>]; POST {"to": ..., "body": "..."} (multipart for audio/file)."""
+    """GET ?with=team|<id>|g<id>[&after=<seq>|&before=<seq>]; POST {"to": ..., "body": "..."} (multipart for audio/file)."""
 
     permission_classes = [IsTeamMember]
 
@@ -380,17 +395,14 @@ class ChatMessagesView(APIView):
         conversation = resolve(me, request.query_params.get("with"))
         messages = conversation.messages(me)
         after, before = request.query_params.get("after"), request.query_params.get("before")
-        try:
-            if after:
-                page = list(messages.filter(id__gt=int(after)).order_by("id")[:PAGE_SIZE * 4])
-            else:
-                if before:
-                    messages = messages.filter(id__lt=int(before))
-                page = list(reversed(messages.order_by("-id")[:PAGE_SIZE]))
-        except ValueError:
-            raise ValidationError({"after": "Use a message id."})
+        if after:
+            page = list(messages.filter(seq__gt=parse_seq(after, "after")).order_by("seq")[:PAGE_SIZE * 4])
+        else:
+            if before:
+                messages = messages.filter(seq__lt=parse_seq(before, "before"))
+            page = list(reversed(messages.order_by("-seq")[:PAGE_SIZE]))
         if page:
-            touch_presence(me, delivered_up_to=page[-1].pk)
+            touch_presence(me, delivered_up_to=page[-1].seq)
         return Response({
             "messages": [message_data(m) for m in page],
             "receipts": receipts(conversation, me),
@@ -433,9 +445,10 @@ class ChatMessagesView(APIView):
             attachment=upload or "", attachment_name=original_name,
             attachment_size=upload.size if upload else None,
         )
-        # Your own message counts as read (and delivered) for you.
-        mark_read(conversation, me, message.pk)
-        touch_presence(me, delivered_up_to=message.pk)
+        # seq comes from the database sequence; read it back, then count the message as read for you.
+        message.refresh_from_db(fields=["seq"])
+        mark_read(conversation, me, message.seq)
+        touch_presence(me, delivered_up_to=message.seq)
         return Response(message_data(message), status=status.HTTP_201_CREATED)
 
 
@@ -485,23 +498,19 @@ class ChatFileView(APIView):
 
 
 class ChatReadView(APIView):
-    """POST {"with": "team"|<id>|"g<id>", "last_id": <id>} marks a conversation read up to that message."""
+    """POST {"with": "team"|<id>|"g<id>", "last_seq": <seq>} marks a conversation read up to that message."""
 
     permission_classes = [IsTeamMember]
 
     def post(self, request):
         me = request.user
         conversation = resolve(me, request.data.get("with"), required=True)
-        try:
-            last_id = int(request.data.get("last_id") or 0)
-        except (TypeError, ValueError):
-            raise ValidationError({"last_id": "Use a message id."})
-        mark_read(conversation, me, last_id)
+        mark_read(conversation, me, parse_seq(request.data.get("last_seq") or 0, "last_seq"))
         return Response({"unread": unread_counts(me)})
 
 
 class ChatUpdatesView(APIView):
-    """Polled by the app every few seconds: unread counts, who's online, and new messages after ?after=<id>.
+    """Polled by the app every few seconds: unread counts, who's online, and new messages after ?after=<seq>.
 
     Polling also marks everything you can see as delivered to you, and you as online.
     """
@@ -511,17 +520,17 @@ class ChatUpdatesView(APIView):
     def get(self, request):
         me = request.user
         visible = visible_to(me)
-        latest = visible.order_by("-id").values_list("id", flat=True).first() or 0
+        latest = visible.order_by("-seq").values_list("seq", flat=True).first() or 0
         touch_presence(me, delivered_up_to=latest)
         unread = unread_counts(me)
         new = []
         after = request.query_params.get("after")
         if after and after.isdigit():
             incoming = (
-                visible.filter(id__gt=int(after))
+                visible.filter(seq__gt=int(after))
                 .exclude(sender=me)
                 .select_related("sender", "group")
-                .order_by("id")[:20]
+                .order_by("seq")[:20]
             )
             new = [
                 {
@@ -533,7 +542,7 @@ class ChatUpdatesView(APIView):
                 for m in incoming
             ]
         return Response({
-            "latest_id": latest,
+            "latest_seq": latest,
             "unread": unread,
             "total_unread": sum(unread.values()),
             "presence": presence_of(list(team_members().exclude(pk=me.pk))),

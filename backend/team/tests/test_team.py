@@ -148,7 +148,7 @@ class ChatTests(TeamTestCase):
 
     def test_read_markers_and_new_message_updates(self):
         self.as_user(self.production)
-        latest = self.client.get("/api/chat/updates/").json()["latest_id"]
+        latest = self.client.get("/api/chat/updates/").json()["latest_seq"]
         self.as_user(self.writer)
         first = self.send("One", to=self.production.pk).json()
         self.send("Two", to=self.production.pk)
@@ -157,9 +157,9 @@ class ChatTests(TeamTestCase):
         updates = self.client.get(f"/api/chat/updates/?after={latest}").json()
         self.assertEqual([m["body"] for m in updates["new"]], ["One", "Two"])
         self.assertEqual(updates["new"][0]["sender_person"]["full_name"], "Asha")
-        response = self.client.post("/api/chat/read/", {"with": self.writer.pk, "last_id": first["id"]}, format="json")
+        response = self.client.post("/api/chat/read/", {"with": self.writer.pk, "last_seq": first["seq"]}, format="json")
         self.assertEqual(response.json()["unread"][str(self.writer.pk)], 1)
-        self.client.post("/api/chat/read/", {"with": self.writer.pk, "last_id": updates["latest_id"]}, format="json")
+        self.client.post("/api/chat/read/", {"with": self.writer.pk, "last_seq": updates["latest_seq"]}, format="json")
         self.assertEqual(self.client.get("/api/chat/updates/").json()["total_unread"], 0)
 
     def test_own_messages_are_not_unread(self):
@@ -443,31 +443,31 @@ class ReceiptTests(TeamTestCase):
     def test_sent_delivered_seen_in_a_direct_chat(self):
         self.as_user(self.writer)
         message = self.send("Draft ready", to=self.production.pk)
-        pm = self.receipts_for(self.writer, self.production.pk)[self.production.pk]
-        self.assertLess(pm["delivered_up_to"], message["id"])  # sent: one tick
-        self.assertLess(pm["read_up_to"], message["id"])
+        pm = self.receipts_for(self.writer, self.production.pk)[str(self.production.pk)]
+        self.assertLess(pm["delivered_up_to"], message["seq"])  # sent: one tick
+        self.assertLess(pm["read_up_to"], message["seq"])
 
         # The Production Manager's app polls: delivered (two ticks), not yet seen.
         self.as_user(self.production)
         self.client.get("/api/chat/updates/")
-        pm = self.receipts_for(self.writer, self.production.pk)[self.production.pk]
-        self.assertGreaterEqual(pm["delivered_up_to"], message["id"])
-        self.assertLess(pm["read_up_to"], message["id"])
+        pm = self.receipts_for(self.writer, self.production.pk)[str(self.production.pk)]
+        self.assertGreaterEqual(pm["delivered_up_to"], message["seq"])
+        self.assertLess(pm["read_up_to"], message["seq"])
 
         # They open the chat: seen (blue ticks).
         self.as_user(self.production)
-        self.client.post("/api/chat/read/", {"with": self.writer.pk, "last_id": message["id"]}, format="json")
-        pm = self.receipts_for(self.writer, self.production.pk)[self.production.pk]
-        self.assertGreaterEqual(pm["read_up_to"], message["id"])
+        self.client.post("/api/chat/read/", {"with": self.writer.pk, "last_seq": message["seq"]}, format="json")
+        pm = self.receipts_for(self.writer, self.production.pk)[str(self.production.pk)]
+        self.assertGreaterEqual(pm["read_up_to"], message["seq"])
 
     def test_team_room_receipts_list_everyone_else(self):
         self.as_user(self.writer)
         message = self.send("Morning!")
         self.as_user(self.hr)
-        self.client.post("/api/chat/read/", {"with": "team", "last_id": message["id"]}, format="json")
+        self.client.post("/api/chat/read/", {"with": "team", "last_seq": message["seq"]}, format="json")
         rows = self.receipts_for(self.writer, "team")
-        self.assertEqual(set(rows), {self.production.pk, self.hr.pk, self.sales.pk})
-        seen = [r["name"] for r in rows.values() if r["read_up_to"] >= message["id"]]
+        self.assertEqual(set(rows), {str(self.production.pk), str(self.hr.pk), str(self.sales.pk)})
+        seen = [r["name"] for r in rows.values() if r["read_up_to"] >= message["seq"]]
         self.assertEqual(len(seen), 1)
 
 
@@ -475,7 +475,7 @@ class PresenceTests(TeamTestCase):
     def test_online_while_the_app_polls(self):
         self.as_user(self.production)
         before = self.client.get("/api/chat/contacts/").json()
-        writer = next(c for c in before["contacts"] if c["id"] == self.writer.pk)
+        writer = next(c for c in before["contacts"] if c["id"] == str(self.writer.pk))
         self.assertFalse(writer["online"])
         self.assertIsNone(writer["last_seen"])
 
@@ -509,7 +509,7 @@ class GroupChatTests(TeamTestCase):
         response = self.make_group([self.sales])
         self.assertEqual(response.status_code, 201, response.json())
         group = response.json()
-        self.assertEqual(set(group["members"]), {self.writer.pk, self.sales.pk})
+        self.assertEqual(set(group["members"]), {str(self.writer.pk), str(self.sales.pk)})
         sent = self.client.post("/api/chat/messages/", {"to": group["key"], "body": "Kick-off"}, format="json")
         self.assertEqual(sent.status_code, 201, sent.json())
         self.assertEqual(sent.json()["group"], group["id"])
@@ -555,9 +555,9 @@ class GroupChatTests(TeamTestCase):
         self.assertEqual(self.client.patch(url, {"name": "Mine now"}, format="json").status_code, 403)
         # The creator can rename it and add or remove people.
         self.as_user(self.writer)
-        response = self.client.patch(url, {"name": "Order 4512", "add": [self.production.pk], "remove": [self.hr.pk]}, format="json")
+        response = self.client.patch(url, {"name": "Order 4512", "add": [str(self.production.pk)], "remove": [self.hr.pk]}, format="json")
         self.assertEqual(response.status_code, 200, response.json())
-        self.assertEqual(set(response.json()["members"]), {self.writer.pk, self.sales.pk, self.production.pk})
+        self.assertEqual(set(response.json()["members"]), {str(self.writer.pk), str(self.sales.pk), str(self.production.pk)})
         # So can the Production Manager.
         self.as_user(self.production)
         response = self.client.patch(url, {"remove": [self.sales.pk]}, format="json")
@@ -578,12 +578,12 @@ class GroupChatTests(TeamTestCase):
         group = self.make_group([self.sales, self.hr]).json()
         message = self.client.post("/api/chat/messages/", {"to": group["key"], "body": "Hi"}, format="json").json()
         self.as_user(self.sales)
-        self.client.post("/api/chat/read/", {"with": group["key"], "last_id": message["id"]}, format="json")
+        self.client.post("/api/chat/read/", {"with": group["key"], "last_seq": message["seq"]}, format="json")
         self.as_user(self.writer)
         rows = {r["id"]: r for r in self.client.get(f"/api/chat/messages/?with={group['key']}").json()["receipts"]}
-        self.assertEqual(set(rows), {self.sales.pk, self.hr.pk})
-        self.assertGreaterEqual(rows[self.sales.pk]["read_up_to"], message["id"])
-        self.assertLess(rows[self.hr.pk]["read_up_to"], message["id"])
+        self.assertEqual(set(rows), {str(self.sales.pk), str(self.hr.pk)})
+        self.assertGreaterEqual(rows[str(self.sales.pk)]["read_up_to"], message["seq"])
+        self.assertLess(rows[str(self.hr.pk)]["read_up_to"], message["seq"])
 
 
 class ConversationTargetTests(TeamTestCase):
@@ -601,5 +601,23 @@ class ConversationTargetTests(TeamTestCase):
         group = self.client.post("/api/chat/groups/", {"name": "G", "members": [self.sales.pk]}, format="json").json()
         self.client.post("/api/chat/messages/", {"to": group["key"], "body": "in the group"}, format="json")
         message = ChatMessage.objects.get()
-        self.assertEqual((message.group_id, message.recipient_id), (group["id"], None))
+        self.assertEqual((str(message.group_id), message.recipient_id), (group["id"], None))
         self.assertEqual(self.client.get("/api/chat/messages/?with=team").json()["messages"], [])
+
+
+class UuidTests(TeamTestCase):
+    def test_ids_are_uuids_and_messages_keep_their_order(self):
+        import uuid as uuidlib
+
+        self.as_user(self.writer)
+        first = self.client.post("/api/chat/messages/", {"to": "team", "body": "one"}, format="json").json()
+        second = self.client.post("/api/chat/messages/", {"to": "team", "body": "two"}, format="json").json()
+        for value in [first["id"], first["sender"], second["id"]]:
+            uuidlib.UUID(value)  # raises if not a UUID
+        self.assertGreater(second["seq"], first["seq"])
+        me = self.client.get("/api/auth/me/").json()
+        self.assertEqual(uuidlib.UUID(me["id"]), self.writer.pk)
+        self.assertEqual(uuidlib.UUID(me["role"]["id"]), self.writer.role.pk)
+        # Old-style number ids are refused rather than misread.
+        self.assertEqual(self.client.get("/api/chat/messages/?with=5").status_code, 400)
+        self.assertEqual(self.client.get("/api/chat/messages/1/audio/").status_code, 404)

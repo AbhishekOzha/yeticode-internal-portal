@@ -216,7 +216,8 @@ class AdminSiteTests(TestCase):
     def test_super_admin_creates_user_with_role(self):
         User.objects.create_superuser(username="boss", password="pw-12345!")
         self.client.login(username="boss", password="pw-12345!")
-        for page in ["/admin/accounts/user/", "/admin/accounts/user/add/", "/admin/accounts/role/1/change/", "/admin/accounts/unit/"]:
+        role_page = f"/admin/accounts/role/{Role.objects.first().pk}/change/"
+        for page in ["/admin/accounts/user/", "/admin/accounts/user/add/", role_page, "/admin/accounts/unit/"]:
             self.assertEqual(self.client.get(page).status_code, 200, page)
         role = Role.objects.get(code="web_developer")
         response = self.client.post(

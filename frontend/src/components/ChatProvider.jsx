@@ -28,7 +28,7 @@ export function ChatProvider({ user, children }) {
     setUnread(updates.unread)
     setPresence(updates.presence ?? {})
     const first = latestId.current === null
-    latestId.current = updates.latest_id
+    latestId.current = updates.latest_seq
     if (first || !updates.new.length) return
     setVersion((v) => v + 1)
     for (const message of updates.new) {

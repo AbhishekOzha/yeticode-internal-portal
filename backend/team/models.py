@@ -7,6 +7,7 @@ from django.conf import settings
 from django.core.files.storage import FileSystemStorage
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import Func
 
 TEAM_UNIT = "content"
 
@@ -74,9 +75,17 @@ def attachment_upload_to(instance, filename):
     return f"chat_files/{uuid.uuid4().hex}.{extension}"
 
 
+class NextMessageSeq(Func):
+    """nextval() on the chat message sequence: message ids are random UUIDs, so order comes from this."""
+
+    template = "nextval('team_chatmessage_seq')"
+    output_field = models.BigIntegerField()
+
+
 class ChatGroup(models.Model):
     """A group chat within the team, e.g. "Order 4512 writers"."""
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=80)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+"
@@ -94,12 +103,15 @@ class ChatGroup(models.Model):
 class ChatMessage(models.Model):
     """A message to the whole team (no recipient or group), one colleague, or a group."""
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="chat_sent")
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name="chat_received",
         help_text="Empty for the team room.",
     )
     group = models.ForeignKey(ChatGroup, on_delete=models.CASCADE, null=True, blank=True, related_name="messages")
+    # Increasing message number (ids are UUIDs): used for ordering, "new since", read and delivered markers.
+    seq = models.BigIntegerField(db_default=NextMessageSeq(), unique=True, editable=False)
     body = models.TextField(max_length=4000, blank=True)
     audio = models.FileField(upload_to=voice_upload_to, storage=private_storage, blank=True)
     audio_duration = models.PositiveIntegerField(null=True, blank=True, help_text="Seconds.")
@@ -109,8 +121,8 @@ class ChatMessage(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
-        ordering = ["id"]
-        indexes = [models.Index(fields=["sender", "recipient", "id"])]
+        ordering = ["seq"]
+        indexes = [models.Index(fields=["sender", "recipient", "seq"])]
 
     def __str__(self):
         return f"{self.sender} → {self.recipient or 'team'}: {self.body[:40] or self.attachment_name or 'voice message'}"
@@ -119,13 +131,14 @@ class ChatMessage(models.Model):
 class ChatRead(models.Model):
     """The last message a person has seen in one conversation: a colleague, a group or the team room."""
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
     peer = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name="+",
         help_text="The colleague, for a one-to-one chat.",
     )
     group = models.ForeignKey(ChatGroup, on_delete=models.CASCADE, null=True, blank=True, related_name="+")
-    last_read_id = models.PositiveBigIntegerField(default=0)
+    last_read_seq = models.PositiveBigIntegerField(default=0, help_text="The seq of the last message seen.")
 
     class Meta:
         constraints = [
@@ -147,7 +160,7 @@ class ChatPresence(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True, related_name="chat_presence"
     )
     last_seen = models.DateTimeField()
-    delivered_up_to = models.PositiveBigIntegerField(default=0)
+    delivered_up_to = models.PositiveBigIntegerField(default=0, help_text="The seq of the newest message fetched.")
 
 
 class Review(models.Model):
@@ -157,6 +170,7 @@ class Review(models.Model):
     Production Manager, Sales Manager, HR, …), once per person per month.
     """
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reviews_written")
     subject = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reviews_received")
     month = models.DateField(help_text="The first day of the month the review is for.")

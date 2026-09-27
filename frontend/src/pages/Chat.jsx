@@ -63,7 +63,8 @@ function Conversation({ me, target, people, onBack, onSent, onManageGroup }) {
   const [recording, setRecording] = useState(false)
   const [uploading, setUploading] = useState(false)
   const listRef = useRef(null)
-  const lastId = messages?.length ? messages[messages.length - 1].id : 0
+  // Message ids are UUIDs; `seq` is each message's increasing position in the chat.
+  const lastId = messages?.length ? messages[messages.length - 1].seq : 0
   const lastIdRef = useRef(0)
   useEffect(() => {
     lastIdRef.current = lastId
@@ -343,7 +344,7 @@ export default function Chat() {
     const q = query.trim().toLowerCase()
     return data.contacts
       .filter((c) => `${displayName(c)} ${c.role} ${c.email}`.toLowerCase().includes(q))
-      .sort((a, b) => (b.last_message?.id ?? 0) - (a.last_message?.id ?? 0) || displayName(a).localeCompare(displayName(b)))
+      .sort((a, b) => (b.last_message?.seq ?? 0) - (a.last_message?.seq ?? 0) || displayName(a).localeCompare(displayName(b)))
   }, [data, query])
 
   function open(conversation) {

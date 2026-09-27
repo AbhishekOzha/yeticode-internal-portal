@@ -23,6 +23,10 @@ With Docker instead, `docker compose up -d db` starts one with database, user an
 password all set to `yeticode`; put those values in `.env`. Stop any other
 PostgreSQL on port 5432 first, or the two will clash.
 
+> **Upgrading a database from before UUIDs (September 2026)?** The migrations were reset for UUID ids, so an
+> older database can't be migrated in place. Point `DJANGO_DATABASE` at a new, empty database and run
+> `migrate` (then `create_default_users`); copy any data you need across.
+
 ### 2. Backend
 
 ```bash
@@ -74,6 +78,7 @@ Check the frontend with `yarn lint` and `yarn build`. Run the backend tests with
 
 | Concept | Where it lives |
 | --- | --- |
+| IDs | Every record of the app's own (units, roles, users, company settings, payroll, office hours, chat, groups, reviews) has a random **UUID** primary key, so ids in URLs and the API can't be guessed or counted. Chat messages also carry an increasing `seq` from a database sequence, used for ordering, "new since", unread, delivered and seen. Django's built-in tables (permissions, content types, sessions) keep their own ids. |
 | Units | `Unit` model: Web App Development, Training, Academic Content Writing |
 | Roles | `Role` model with a set of capabilities. A role belongs to one unit, or to no unit when it is company-wide (Head HR). |
 | Users | `User.role` (one role). `User.unit` is read from the role, so a user can't hold a role from another unit. A database constraint requires a role for everyone except Super Admins. |

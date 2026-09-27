@@ -110,7 +110,7 @@ export const teamApi = {
   createGroup: (name, members) => request('/chat/groups/', { method: 'POST', body: { name, members } }),
   updateGroup: (id, data) => request(`/chat/groups/${id}/`, { method: 'PATCH', body: data }),
   leaveGroup: (id) => request(`/chat/groups/${id}/leave/`, { method: 'POST' }),
-  markChatRead: (withId, lastId) => request('/chat/read/', { method: 'POST', body: { with: String(withId), last_id: lastId } }),
+  markChatRead: (withId, lastSeq) => request('/chat/read/', { method: 'POST', body: { with: String(withId), last_seq: lastSeq } }),
   reviewPeople: (month) => request(`/team/reviews/people/?month=${month}`),
   writeReview: (data) => request('/team/reviews/', { method: 'POST', body: data }),
   withdrawReview: (id) => request(`/team/reviews/${id}/`, { method: 'DELETE' }),

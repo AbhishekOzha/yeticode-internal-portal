@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -9,6 +11,7 @@ from .uploads import avatar_upload_to, logo_upload_to, validate_image
 class Unit(models.Model):
     """A branch of the company, e.g. Web App Development."""
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.SlugField(max_length=50, unique=True)
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
@@ -27,6 +30,7 @@ class Role(models.Model):
     capabilities reaching across units.
     """
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     unit = models.ForeignKey(
         Unit,
         on_delete=models.PROTECT,
@@ -102,6 +106,7 @@ class User(AbstractUser):
     role from another. Users with a company-wide role have no unit.
     """
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     role = models.ForeignKey(
         Role,
         on_delete=models.PROTECT,
@@ -163,9 +168,14 @@ def email_in_use(email, exclude=None):
     ).exists()
 
 
+# The one and only company settings row.
+COMPANY_SETTINGS_ID = uuid.UUID(int=1)
+
+
 class CompanySettings(models.Model):
     """The company's name, contact details and logo. There is only ever one row."""
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=120, default="Yeticode Innovations")
     tagline = models.CharField(max_length=120, blank=True, default="Staff portal")
     email = models.EmailField("contact email", blank=True)
@@ -186,10 +196,10 @@ class CompanySettings(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
-        self.pk = 1
+        self.pk = COMPANY_SETTINGS_ID
         super().save(*args, **kwargs)
 
     @classmethod
     def load(cls):
-        settings, _ = cls.objects.get_or_create(pk=1)
+        settings, _ = cls.objects.get_or_create(pk=COMPANY_SETTINGS_ID)
         return settings

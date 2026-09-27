@@ -6,6 +6,7 @@ Every field is optional. Word and hour extras are priced by a rate such as
 "6,000 words = NPR 1,000", so 3,000 words earns NPR 500.
 """
 
+import uuid
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
@@ -62,6 +63,7 @@ class StaffPay(models.Model):
 class PayExtra(models.Model):
     """One extra payment for a month, optionally for a particular day."""
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     class Kind(models.TextChoices):
         WORDS = "words", "Extra task (words)"
         HOURS = "hours", "Extra task (hours)"
