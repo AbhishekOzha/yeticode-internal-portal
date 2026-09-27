@@ -134,3 +134,10 @@ CSRF_TRUSTED_ORIGINS = FRONTEND_ORIGINS
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
+
+# Default accounts created by `python manage.py create_default_users`.
+SYSTEM_USERNAME = os.environ.get("SYSTEM_USERNAME", "superadmin")
+SYSTEM_USER_EMAIL = os.environ.get("SYSTEM_USER_EMAIL", "")
+SYSTEM_USER_PASSWORD = os.environ.get("SYSTEM_USER_PASSWORD", "")
+UNIT_ADMIN_PASSWORD = os.environ.get("UNIT_ADMIN_PASSWORD", "")
+DEFAULT_EMAIL_DOMAIN = os.environ.get("DEFAULT_EMAIL_DOMAIN", "yeticode.com")

@@ -96,3 +96,12 @@ ROLES = [
     (COMPANY_WIDE, "head_hr", "Head HR", 1,
      ["manage_employee_records", "view_all_employee_records"]),
 ]
+
+# The account `create_default_users` makes for each unit: (username, role code).
+# Each gets the unit's most senior role; like every non-Super Admin account,
+# it has no access to the admin panel.
+UNIT_ADMINS = {
+    WEB: ("web_admin", "team_lead"),
+    TRAINING: ("training_admin", "training_manager"),
+    CONTENT: ("content_admin", "production_manager"),
+}
