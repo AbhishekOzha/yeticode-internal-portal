@@ -34,8 +34,19 @@ class LoginView(APIView):
         serializer.is_valid(raise_exception=True)
         user = authenticate(request, **serializer.validated_data)
         if user is None:
+            # People may sign in with their email when it differs from their username.
+            match = User.objects.filter(
+                email__iexact=serializer.validated_data["username"].strip()
+            ).exclude(email="")
+            if match.count() == 1:
+                user = authenticate(
+                    request,
+                    username=match.get().username,
+                    password=serializer.validated_data["password"],
+                )
+        if user is None:
             return Response(
-                {"detail": "Incorrect username or password."},
+                {"detail": "Incorrect email or password."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         login(request, user)

@@ -136,8 +136,8 @@ SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 
 # Default accounts created by `python manage.py create_default_users`.
-SYSTEM_USERNAME = os.environ.get("SYSTEM_USERNAME", "superadmin")
-SYSTEM_USER_EMAIL = os.environ.get("SYSTEM_USER_EMAIL", "")
+# Usernames are email addresses; people can sign in with either.
+DEFAULT_EMAIL_DOMAIN = os.environ.get("DEFAULT_EMAIL_DOMAIN", "yeticode.com")
+SYSTEM_USERNAME = os.environ.get("SYSTEM_USERNAME", f"admin@{DEFAULT_EMAIL_DOMAIN}")
 SYSTEM_USER_PASSWORD = os.environ.get("SYSTEM_USER_PASSWORD", "")
 UNIT_ADMIN_PASSWORD = os.environ.get("UNIT_ADMIN_PASSWORD", "")
-DEFAULT_EMAIL_DOMAIN = os.environ.get("DEFAULT_EMAIL_DOMAIN", "yeticode.com")

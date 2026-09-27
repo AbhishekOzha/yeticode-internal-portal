@@ -13,7 +13,7 @@ from rest_framework.permissions import BasePermission
 
 from .dashboard import can_manage_users
 from .models import Role, User, check_role_capabilities
-from .rbac import CAPABILITIES, CROSS_UNIT_CAPABILITIES
+from .rbac import CAPABILITIES, CAPABILITY_GROUPS, CROSS_UNIT_CAPABILITIES
 
 
 class CanManageUsers(BasePermission):
@@ -40,6 +40,7 @@ class ManagedUserSerializer(serializers.ModelSerializer):
     )
     role_name = serializers.CharField(source="role.name", read_only=True, default=None)
     unit = serializers.SerializerMethodField()
+    unit_code = serializers.SerializerMethodField()
     is_super_admin = serializers.BooleanField(source="is_superuser", required=False)
     password = serializers.CharField(
         write_only=True, required=False, allow_blank=False, trim_whitespace=False
@@ -49,15 +50,18 @@ class ManagedUserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "username", "first_name", "last_name", "email",
-            "role", "role_name", "unit", "is_super_admin", "is_active",
+            "role", "role_name", "unit", "unit_code", "is_super_admin", "is_active",
             "password", "last_login", "date_joined",
         ]
         read_only_fields = ["last_login", "date_joined"]
 
     def get_unit(self, obj):
         if obj.is_superuser:
-            return "All units (Super Admin)"
+            return "All units"
         return unit_label(obj.unit)
+
+    def get_unit_code(self, obj):
+        return obj.unit.code if obj.unit else None
 
     def validate(self, attrs):
         actor = self.context["request"].user
@@ -142,12 +146,16 @@ class ManagedUserViewSet(
 class ManagedRoleSerializer(serializers.ModelSerializer):
     unit = serializers.SerializerMethodField()
     unit_id = serializers.IntegerField(read_only=True)
+    unit_code = serializers.CharField(source="unit.code", read_only=True, default=None)
     capabilities = serializers.ListField(child=serializers.CharField(), required=False)
     member_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Role
-        fields = ["id", "code", "name", "rank", "unit", "unit_id", "capabilities", "member_count"]
+        fields = [
+            "id", "code", "name", "rank", "unit", "unit_id", "unit_code",
+            "capabilities", "member_count",
+        ]
         read_only_fields = ["code", "name", "rank"]
 
     def get_unit(self, obj):
@@ -216,6 +224,7 @@ class CapabilityListView(viewsets.ViewSet):
                     "label": label,
                     "description": description,
                     "cross_unit": code in CROSS_UNIT_CAPABILITIES,
+                    "group": CAPABILITY_GROUPS.get(code, "Other"),
                 }
                 for code, (label, description) in CAPABILITIES.items()
             ]

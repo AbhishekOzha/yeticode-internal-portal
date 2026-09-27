@@ -8,7 +8,7 @@ Manager, Production Manager) manages accounts in its own unit only. The Django
 admin panel is still there for Super Admins as a fallback.
 
 - `backend/` — Django 5.2 LTS, Django REST Framework, PostgreSQL
-- `frontend/` — React 19 + Vite
+- `frontend/` — React 19 + Vite + Ant Design 6 (light and dark themes)
 
 ## Running it locally
 
@@ -32,19 +32,22 @@ pip install -r requirements.txt
 cp .env.example .env                    # then set DB_PASSWORD etc.; loaded automatically, git ignores it
 python manage.py migrate                # also creates the units, roles and default permissions
 python manage.py create_default_users  # Super Admin + one admin per unit (safe to re-run)
-python manage.py create_demo_users      # optional, dev only: one account per role
+python manage.py create_demo_users      # optional, dev only: one sample person per role
 python manage.py runserver              # http://localhost:8000/admin/
 ```
 
-`create_default_users` makes these accounts if they don't exist yet:
+`create_default_users` makes these accounts if they don't exist yet. Everyone
+signs in with their email (the domain comes from `DEFAULT_EMAIL_DOMAIN`):
 
-| Username | Role | Unit |
+| Sign-in email | Name | Role |
 | --- | --- | --- |
-| `superadmin` (or `SYSTEM_USERNAME`) | Super Admin | All units, admin panel |
-| `web_admin` | Team Lead (manages Web App Development users) | Web App Development |
-| `training_admin` | Training Manager (manages Training users) | Training |
-| `content_admin` | Production Manager (manages Academic Content Writing users) | Academic Content Writing |
+| `admin@yeticode.com` (or `SYSTEM_USERNAME`) | System Administrator | Super Admin, all units |
+| `webdev.lead@yeticode.com` | Web Development Lead | Team Lead, manages Web App Development users |
+| `training.manager@yeticode.com` | Training Manager | Training Manager, manages Training users |
+| `production.manager@yeticode.com` | Production Manager | Production Manager, manages Academic Content Writing users |
 
+Accounts created by earlier versions (`superadmin`, `web_admin`, `training_admin`,
+`content_admin`) are renamed to these emails in place, keeping their passwords.
 Passwords come from `SYSTEM_USER_PASSWORD` and `UNIT_ADMIN_PASSWORD` in `.env`.
 With `DEBUG=TRUE` and no password set, they default to `yeticode@123`; in
 production the command refuses to run without them.

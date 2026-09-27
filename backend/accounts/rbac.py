@@ -42,6 +42,34 @@ CAPABILITIES = {
     ),
 }
 
+# How capabilities are grouped on the Roles & permissions page.
+CAPABILITY_GROUPS = {
+    "view_unit_directory": "General",
+    "manage_unit_users": "General",
+    "view_projects": "Web App Development",
+    "work_on_tasks": "Web App Development",
+    "review_code": "Web App Development",
+    "assign_tasks": "Web App Development",
+    "manage_dev_team": "Web App Development",
+    "view_courses": "Training",
+    "view_own_progress": "Training",
+    "teach_classes": "Training",
+    "grade_students": "Training",
+    "manage_enquiries": "Training",
+    "manage_enrollments": "Training",
+    "manage_batches": "Training",
+    "view_training_reports": "Training",
+    "write_content": "Academic Content Writing",
+    "conduct_research": "Academic Content Writing",
+    "review_content": "Academic Content Writing",
+    "manage_production": "Academic Content Writing",
+    "manage_leads": "Academic Content Writing",
+    "view_sales_reports": "Academic Content Writing",
+    "manage_sales_team": "Academic Content Writing",
+    "manage_employee_records": "HR",
+    "view_all_employee_records": "HR",
+}
+
 # Capabilities that reach across units. Only company-wide roles (roles with no
 # unit) may hold them, so unit-scoped roles stay isolated from other units.
 CROSS_UNIT_CAPABILITIES = {"view_all_employee_records"}
@@ -100,10 +128,10 @@ ROLES = [
 
 # Each unit's admin is its most senior role, which also holds manage_unit_users
 # (accounts in its own unit only). `create_default_users` makes one account per
-# unit with that role: (username, role code). No unit admin can use the
-# Django admin panel.
+# unit with that role. No unit admin can use the Django admin panel.
+# unit -> (email local part, role code, display name, legacy username)
 UNIT_ADMINS = {
-    WEB: ("web_admin", "team_lead"),
-    TRAINING: ("training_admin", "training_manager"),
-    CONTENT: ("content_admin", "production_manager"),
+    WEB: ("webdev.lead", "team_lead", "Web Development Lead", "web_admin"),
+    TRAINING: ("training.manager", "training_manager", "Training Manager", "training_admin"),
+    CONTENT: ("production.manager", "production_manager", "Production Manager", "content_admin"),
 }

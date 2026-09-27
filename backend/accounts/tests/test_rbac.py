@@ -120,6 +120,12 @@ class ApiTests(TestCase):
             [w["key"] for w in body["dashboard"]], body["capabilities"]
         )
 
+    def test_login_with_email(self):
+        user = make_user("hr", username="hr_person")
+        user.email = "Maya@Yeticode.com"
+        user.save()
+        self.assertEqual(self.login("maya@yeticode.com").status_code, 200)
+
     def test_wrong_password_is_rejected(self):
         make_user("student", username="ram")
         self.assertEqual(self.login("ram", "wrong").status_code, 400)

@@ -7,6 +7,7 @@ const backend = process.env.BACKEND_URL || 'http://localhost:8000'
 
 export default defineConfig({
   plugins: [react()],
+  build: { chunkSizeWarningLimit: 1600 },
   server: {
     proxy: {
       '/api': backend,

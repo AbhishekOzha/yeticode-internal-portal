@@ -29,7 +29,7 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            "id", "username", "full_name", "email", "unit", "role",
+            "id", "username", "full_name", "first_name", "last_name", "email", "unit", "role",
             "is_super_admin", "capabilities", "dashboard",
             "can_manage_users", "can_manage_roles",
         ]
@@ -60,9 +60,13 @@ class LoginSerializer(serializers.Serializer):
 
 class CompanyMemberSerializer(MemberSerializer):
     unit = serializers.SerializerMethodField()
+    unit_code = serializers.SerializerMethodField()
 
     class Meta(MemberSerializer.Meta):
-        fields = MemberSerializer.Meta.fields + ["unit"]
+        fields = MemberSerializer.Meta.fields + ["unit", "unit_code"]
 
     def get_unit(self, obj):
         return obj.unit.name if obj.unit else "All units"
+
+    def get_unit_code(self, obj):
+        return obj.unit.code if obj.unit else None
