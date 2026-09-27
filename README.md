@@ -82,7 +82,7 @@ Run the backend tests with `python manage.py test` (needs the `CREATEDB` permiss
 | Capabilities | Django permissions `accounts.<codename>`, defined in `accounts/rbac.py` and checked with `user.has_perm(...)`, or `has_capability(...)` in DRF views. |
 | Dashboards | `/api/auth/me/` returns one dashboard widget per capability; the React app renders them. |
 | Profiles | Everyone has a **My profile** page (user menu): they can upload their own photo and add, change or remove one secondary email. The primary email is the sign-in address; only Super Admins, or unit admins for other people in their unit, can change it, and it can never be blank. When a username was the email, it follows the new email. |
-| Payroll | Academic Content Writing only (`payroll` app). Super Admins, and content-unit roles with `manage_payroll` (Production Manager and HR), set each person's monthly salary and default rates, and record extras per month: words (6,000 words = NPR 1,000 by default, so 3,000 words = NPR 500), hours (8 hours = NPR 1,000), performance and effort. Every amount is optional, extras can be dated for daily extras, and the server does the calculation. Only a Super Admin can change their own pay. |
+| Payroll | Academic Content Writing only (`payroll` app). Super Admins, and content-unit roles with `manage_payroll` (Production Manager and HR), set each person's monthly salary and default rates, and record extras per month: words (6,000 words = NPR 1,000 by default, so 3,000 words = NPR 500), hours (8 hours = NPR 1,000), performance and effort. Every amount is optional and the server does the calculation. A **daily log** per person holds each day's extra hours and words (one row per day; empty days had no extra work), and each day is priced on its own, e.g. 2 hours = NPR 250 one day and 12 hours = NPR 1,500 another. Only a Super Admin can change their own pay. |
 | Company branding | `CompanySettings` (a single row): name, tagline, contact details and logo. Only Super Admins edit it, on the **Company settings** page. The logo replaces the built-in mark in the sidebar, on the sign-in page and as the tab icon. |
 
 The starting capabilities for each role are in `accounts/rbac.py`. They are
@@ -123,6 +123,7 @@ cards are placeholders for the features each unit will need.
 | `GET /api/auth/me/` | Current user, unit, role, capabilities, dashboard |
 | `GET/PATCH /api/profile/` | Your own `avatar` (multipart upload, or `null` to remove) and `secondary_email`. The primary email is refused here. |
 | `GET /api/payroll/staff/?month=YYYY-MM`, `PATCH /api/payroll/staff/<id>/` | Content staff with salary, rates and the month's totals; set someone's pay setup |
+| `GET/PUT /api/payroll/staff/<id>/daily/?month=YYYY-MM` | A person's daily log: `{"days": [{"date", "hours", "words"}]}`. PUT replaces the month's dated hours/words extras; days left out had none. Unchanged days keep the rate they were priced at. |
 | `GET/POST /api/payroll/extras/?month=YYYY-MM[&staff=<id>]`, `PATCH/DELETE /api/payroll/extras/<id>/` | A month's extras. Words and hours extras are priced from the rate; performance and effort take an amount. |
 | `GET /api/branding/` | Company name, tagline and logo. Public, for the sign-in page. |
 | `GET/PATCH /api/manage/company/` | Company details and `logo` (Super Admins only) |

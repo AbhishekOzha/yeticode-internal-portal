@@ -130,3 +130,5 @@ html[data-theme='dark'] .app-header { border-bottom-color: rgba(255, 255, 255, 0
 /* Payroll */
 .nowrap { white-space: nowrap; }
 .payroll-stat .ant-statistic-content { white-space: nowrap; font-size: 22px; }
+.day-worked td { background: rgba(52, 81, 209, 0.06); }
+html[data-theme='dark'] .day-worked td { background: rgba(92, 124, 250, 0.12); }

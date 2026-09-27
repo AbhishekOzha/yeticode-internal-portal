@@ -62,6 +62,9 @@ export const api = {
   listCapabilities: () => request('/manage/capabilities/'),
   payrollStaff: (month) => request(`/payroll/staff/?month=${month}`),
   updateStaffPay: (id, month, data) => request(`/payroll/staff/${id}/?month=${month}`, { method: 'PATCH', body: data }),
+  dailyLog: (id, month) => request(`/payroll/staff/${id}/daily/?month=${month}`),
+  saveDailyLog: (id, month, days) =>
+    request(`/payroll/staff/${id}/daily/?month=${month}`, { method: 'PUT', body: { days } }),
   payrollExtras: (month) => request(`/payroll/extras/?month=${month}`),
   addPayExtra: (data) => request('/payroll/extras/', { method: 'POST', body: data }),
   deletePayExtra: (id) => request(`/payroll/extras/${id}/`, { method: 'DELETE' }),

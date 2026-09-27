@@ -175,3 +175,71 @@ class PayTests(PayrollTestCase):
 
     def test_bad_month(self):
         self.assertEqual(self.client.get("/api/payroll/staff/?month=sept").status_code, 400)
+
+
+class DailyLogTests(PayrollTestCase):
+    def setUp(self):
+        super().setUp()
+        self.as_user(self.production)
+        self.url = f"/api/payroll/staff/{self.writer.pk}/daily/?month=2026-09"
+
+    def save(self, days):
+        return self.client.put(self.url, {"days": days}, format="json")
+
+    def test_each_day_is_priced_on_its_own(self):
+        # 2 hours today, nothing tomorrow or the day after, 12 hours later on.
+        response = self.save([
+            {"date": "2026-09-01", "hours": "2"},
+            {"date": "2026-09-02", "hours": None},
+            {"date": "2026-09-03", "hours": 0},
+            {"date": "2026-09-04", "hours": "12", "words": 3000},
+        ])
+        self.assertEqual(response.status_code, 200, response.json())
+        days = {d["date"]: d for d in response.json()["days"]}
+        self.assertEqual(set(days), {"2026-09-01", "2026-09-04"})
+        self.assertEqual(days["2026-09-01"]["amount"], "250.00")
+        self.assertEqual(days["2026-09-04"]["amount"], "2000.00")  # 12 h = 1,500 + 3,000 words = 500
+        self.assertEqual(days["2026-09-04"]["words"], 3000)
+        self.assertEqual(response.json()["staff"]["extras_total"], "2250.00")
+        self.assertEqual(PayExtra.objects.filter(staff=self.writer).count(), 3)
+
+    def test_saving_again_updates_and_clears_days(self):
+        self.save([{"date": "2026-09-01", "hours": "2"}, {"date": "2026-09-04", "hours": "12"}])
+        response = self.save([{"date": "2026-09-01", "hours": "3"}, {"date": "2026-09-04", "hours": None}])
+        days = response.json()["days"]
+        self.assertEqual([(d["date"], d["amount"]) for d in days], [("2026-09-01", "375.00")])
+
+    def test_unchanged_days_keep_their_rate(self):
+        self.save([{"date": "2026-09-01", "hours": "8"}])
+        self.client.patch(f"/api/payroll/staff/{self.writer.pk}/", {"hours_rate_amount": "2000"}, format="json")
+        response = self.save([{"date": "2026-09-01", "hours": "8"}, {"date": "2026-09-02", "hours": "8"}])
+        amounts = [d["amount"] for d in response.json()["days"]]
+        self.assertEqual(amounts, ["1000.00", "2000.00"])
+
+    def test_other_extras_are_left_alone(self):
+        self.add_extra(kind="performance", amount="1500")
+        self.add_extra(kind="words", quantity="6000")  # a monthly, undated extra
+        self.save([{"date": "2026-09-01", "hours": "2"}])
+        self.save([])
+        self.assertEqual(set(PayExtra.objects.filter(staff=self.writer).values_list("kind", flat=True)), {"performance", "words"})
+
+    def test_day_limits(self):
+        self.assertEqual(self.save([{"date": "2026-09-01", "hours": "25"}]).status_code, 400)
+        self.assertEqual(self.save([{"date": "2026-10-01", "hours": "2"}]).status_code, 400)
+        self.assertEqual(
+            self.save([{"date": "2026-09-01", "hours": "2"}, {"date": "2026-09-01", "hours": "3"}]).status_code, 400
+        )
+
+    def test_single_extra_cannot_duplicate_a_logged_day(self):
+        self.save([{"date": "2026-09-01", "hours": "2"}])
+        response = self.add_extra(kind="hours", quantity="1", date="2026-09-01")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("date", response.json())
+
+    def test_permissions(self):
+        self.as_user(self.writer)
+        self.assertEqual(self.save([]).status_code, 403)
+        self.as_user(self.hr)
+        own = self.client.put(f"/api/payroll/staff/{self.hr.pk}/daily/?month=2026-09", {"days": []}, format="json")
+        self.assertEqual(own.status_code, 403)
+        self.assertEqual(self.client.get(f"/api/payroll/staff/{self.dev.pk}/daily/").status_code, 404)

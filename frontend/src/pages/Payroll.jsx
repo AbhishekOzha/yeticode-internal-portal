@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { DeleteOutlined, LeftOutlined, PlusOutlined, RightOutlined, SettingOutlined } from '@ant-design/icons'
+import { CalendarOutlined, DeleteOutlined, LeftOutlined, PlusOutlined, RightOutlined, SettingOutlined } from '@ant-design/icons'
 import {
   Alert,
   App,
@@ -24,6 +24,7 @@ import {
   Typography,
 } from 'antd'
 import { api } from '../api'
+import DailyLogDrawer from '../components/DailyLogDrawer'
 import { PersonCell } from '../components/People'
 import { displayName } from '../people'
 import {
@@ -121,7 +122,7 @@ function PaySetupDrawer({ staff, month, onClose, onSaved }) {
           label="Daily extras"
           name="daily_extra"
           valuePropName="checked"
-          extra="Turn on for people who earn extras day by day; new extras then default to today's date."
+          extra="Turn on for people who earn extras day by day. Their Daily log button is highlighted, and single extras default to today's date."
         >
           <Switch />
         </Form.Item>
@@ -303,6 +304,7 @@ export default function Payroll({ user }) {
   const [extras, setExtras] = useState([])
   const [setup, setSetup] = useState(null)
   const [adding, setAdding] = useState(null)
+  const [daily, setDaily] = useState(null)
 
   const load = useCallback(() => {
     Promise.all([api.payrollStaff(month), api.payrollExtras(month)])
@@ -388,18 +390,28 @@ export default function Payroll({ user }) {
       title: '',
       key: 'actions',
       align: 'right',
-      width: 180,
+      width: 260,
       render: (_, r) => {
         const own = isOwn(r)
         return (
           <Tooltip title={own ? OWN_PAY : undefined}>
             <Space>
+              <Button
+                size="small"
+                type={r.pay.daily_extra ? 'primary' : 'default'}
+                ghost={r.pay.daily_extra}
+                icon={<CalendarOutlined />}
+                disabled={own}
+                onClick={() => setDaily(r)}
+              >
+                Daily log
+              </Button>
               <Button size="small" icon={<PlusOutlined />} disabled={own} onClick={() => setAdding(r)}>
                 Extra
               </Button>
-              <Button size="small" icon={<SettingOutlined />} disabled={own} onClick={() => setSetup(r)} aria-label={`Pay setup for ${displayName(r)}`}>
-                Setup
-              </Button>
+              <Tooltip title={own ? undefined : 'Pay setup'}>
+                <Button size="small" icon={<SettingOutlined />} disabled={own} onClick={() => setSetup(r)} aria-label={`Pay setup for ${displayName(r)}`} />
+              </Tooltip>
             </Space>
           </Tooltip>
         )
@@ -469,6 +481,16 @@ export default function Payroll({ user }) {
         onClose={() => setSetup(null)}
         onSaved={() => {
           setSetup(null)
+          load()
+        }}
+      />
+      <DailyLogDrawer
+        key={daily ? `${daily.id}-${month}` : 'closed'}
+        staff={daily}
+        month={month}
+        onClose={() => setDaily(null)}
+        onSaved={() => {
+          setDaily(null)
           load()
         }}
       />

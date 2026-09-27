@@ -57,3 +57,10 @@ export function monthBounds(month) {
   const last = new Date(year, m, 0).getDate()
   return { min: `${month}-01`, max: `${month}-${String(last).padStart(2, '0')}` }
 }
+
+// Every day of a month as YYYY-MM-DD strings.
+export function daysOf(month) {
+  const { max } = monthBounds(month)
+  const last = Number(max.slice(-2))
+  return Array.from({ length: last }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`)
+}

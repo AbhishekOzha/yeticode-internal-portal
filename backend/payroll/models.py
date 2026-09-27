@@ -16,6 +16,7 @@ PAYROLL_UNIT = "content"
 DEFAULT_WORDS_PER_RATE = 6000
 DEFAULT_HOURS_PER_RATE = Decimal("8")
 DEFAULT_RATE_AMOUNT = Decimal("1000")
+MAX_HOURS_PER_DAY = Decimal("24")
 
 
 def extra_amount(quantity, per_quantity, per_amount):
@@ -88,6 +89,14 @@ class PayExtra(models.Model):
     class Meta:
         ordering = ["month", "date", "created_at"]
         indexes = [models.Index(fields=["month", "staff"])]
+        constraints = [
+            # The daily log keeps one hours and one words entry per person per day.
+            models.UniqueConstraint(
+                fields=["staff", "date", "kind"],
+                condition=models.Q(date__isnull=False, kind__in=["words", "hours"]),
+                name="one_measured_extra_per_day",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.get_kind_display()} for {self.staff}: NPR {self.amount}"
