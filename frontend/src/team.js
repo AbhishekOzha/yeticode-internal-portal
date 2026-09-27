@@ -12,6 +12,14 @@ export function canManageOfficeHours(user) {
   return user.is_super_admin || (inTeam(user) && MANAGER_CAPABILITIES.some((c) => user.capabilities.includes(c)))
 }
 
+// Super Admins, and the unit's HR and Production Manager, read colleague reviews.
+export function canReadReviews(user) {
+  return (
+    user.is_super_admin ||
+    (inTeam(user) && ['manage_employee_records', 'manage_unit_users'].some((c) => user.capabilities.includes(c)))
+  )
+}
+
 // Python weekday numbers: Monday = 0. Listed Sunday first, as the office week starts on Sunday.
 export const WEEKDAYS = [
   { value: 6, label: 'Sun' },

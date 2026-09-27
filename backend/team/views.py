@@ -12,7 +12,7 @@ from django.db.models import Count, F, OuterRef, Q, Subquery, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -112,6 +112,11 @@ def hours_row(user):
     return {**person(user), "office_hours": hours}
 
 
+def check_not_own_hours(actor, user):
+    if user.pk == actor.pk and not actor.is_superuser:
+        raise PermissionDenied("Your own office hours are set by someone else: a Super Admin, HR or the Production Manager.")
+
+
 class OfficeHoursListView(APIView):
     permission_classes = [CanManageOfficeHours]
 
@@ -125,6 +130,7 @@ class OfficeHoursDetailView(APIView):
 
     def put(self, request, pk):
         user = get_object_or_404(team_members(), pk=pk)
+        check_not_own_hours(request.user, user)
         instance = OfficeHours.objects.filter(user=user).first()
         serializer = OfficeHoursSerializer(instance, data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -133,6 +139,7 @@ class OfficeHoursDetailView(APIView):
 
     def delete(self, request, pk):
         user = get_object_or_404(team_members(), pk=pk)
+        check_not_own_hours(request.user, user)
         OfficeHours.objects.filter(user=user).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

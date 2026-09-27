@@ -1,6 +1,7 @@
 """Office hours and team chat for the Academic Content Writing unit."""
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 TEAM_UNIT = "content"
@@ -74,3 +75,29 @@ class ChatRead(models.Model):
                 fields=["user"], condition=models.Q(peer__isnull=True), name="one_team_read_marker",
             ),
         ]
+
+
+class Review(models.Model):
+    """One colleague's monthly review of another: a 1–5 rating and an optional comment.
+
+    Anyone in the team can review anyone else in it (writers, supervisors, the
+    Production Manager, Sales Manager, HR, …), once per person per month.
+    """
+
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reviews_written")
+    subject = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reviews_received")
+    month = models.DateField(help_text="The first day of the month the review is for.")
+    rating = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)])
+    comment = models.TextField(blank=True, max_length=2000)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-month", "-updated_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["author", "subject", "month"], name="one_review_per_person_per_month"),
+            models.CheckConstraint(condition=~models.Q(author=models.F("subject")), name="no_self_review"),
+        ]
+
+    def __str__(self):
+        return f"{self.author} on {self.subject} ({self.month:%Y-%m}): {self.rating}/5"

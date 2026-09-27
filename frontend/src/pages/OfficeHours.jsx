@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { BellOutlined, ClockCircleOutlined, EditOutlined } from '@ant-design/icons'
-import { App, Button, Card, Checkbox, Col, Flex, Form, Input, Modal, Row, Segmented, Switch, Table, Tag, Typography } from 'antd'
+import { App, Button, Card, Checkbox, Col, Flex, Form, Input, Modal, Row, Segmented, Switch, Table, Tag, Tooltip, Typography } from 'antd'
 import { teamApi } from '../api'
 import { PersonCell } from '../components/People'
 import { displayName } from '../people'
@@ -98,7 +98,7 @@ function ShiftModal({ staff, onClose, onSaved }) {
   )
 }
 
-export default function OfficeHours() {
+export default function OfficeHours({ user }) {
   const { message, modal } = App.useApp()
   const [staff, setStaff] = useState(null)
   const [editing, setEditing] = useState(null)
@@ -170,18 +170,23 @@ export default function OfficeHours() {
       key: 'actions',
       align: 'right',
       width: 170,
-      render: (_, r) => (
-        <Flex gap={8} justify="flex-end">
-          <Button size="small" icon={<EditOutlined />} onClick={() => setEditing(r)}>
-            {r.office_hours ? 'Edit' : 'Set hours'}
-          </Button>
-          {r.office_hours && (
-            <Button size="small" type="text" danger onClick={() => confirmClear(r)}>
-              Clear
-            </Button>
-          )}
-        </Flex>
-      ),
+      render: (_, r) => {
+        const own = r.id === user.id && !user.is_super_admin
+        return (
+          <Tooltip title={own ? 'Your own office hours are set by someone else.' : undefined}>
+            <Flex gap={8} justify="flex-end">
+              <Button size="small" icon={<EditOutlined />} disabled={own} onClick={() => setEditing(r)}>
+                {r.office_hours ? 'Edit' : 'Set hours'}
+              </Button>
+              {r.office_hours && (
+                <Button size="small" type="text" danger disabled={own} onClick={() => confirmClear(r)}>
+                  Clear
+                </Button>
+              )}
+            </Flex>
+          </Tooltip>
+        )
+      },
     },
   ]
 

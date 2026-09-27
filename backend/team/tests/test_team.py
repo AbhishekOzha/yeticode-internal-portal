@@ -173,3 +173,108 @@ class ChatTests(TeamTestCase):
         self.as_user(self.writer)
         names = {c["username"] for c in self.client.get("/api/chat/contacts/").json()["contacts"]}
         self.assertNotIn("sales", names)
+
+
+class OwnOfficeHoursTests(TeamTestCase):
+    def put_hours(self, user):
+        return self.client.put(
+            f"/api/team/office-hours/{user.pk}/",
+            {"start_time": "09:00", "end_time": "17:00", "work_days": [0]},
+            format="json",
+        )
+
+    def test_nobody_but_a_super_admin_sets_their_own_hours(self):
+        self.as_user(self.writer)
+        self.assertEqual(self.put_hours(self.writer).status_code, 403)
+        for manager in [self.production, self.hr]:
+            self.as_user(manager)
+            self.assertEqual(self.put_hours(manager).status_code, 403, manager.username)
+            self.assertEqual(self.client.delete(f"/api/team/office-hours/{manager.pk}/").status_code, 403)
+        # HR sets the Production Manager's hours, and the other way round.
+        self.assertEqual(self.put_hours(self.production).status_code, 200)
+        self.as_user(self.production)
+        self.assertEqual(self.put_hours(self.hr).status_code, 200)
+
+
+class ReviewTests(TeamTestCase):
+    def setUp(self):
+        super().setUp()
+        self.supervisor = User.objects.create_user(
+            username="sup", password=PASSWORD, role=role("content", "supervisor")
+        )
+        self.sales_manager = User.objects.create_user(
+            username="salesmgr", password=PASSWORD, role=role("content", "sales_manager")
+        )
+        self.writer2 = User.objects.create_user(
+            username="writer2", password=PASSWORD, role=role("content", "content_writer")
+        )
+
+    def review(self, subject, rating=4, comment="", month="2026-09"):
+        return self.client.post(
+            "/api/team/reviews/", {"subject": subject.pk, "rating": rating, "comment": comment, "month": month}, format="json"
+        )
+
+    def test_writer_reviews_everyone_in_the_team(self):
+        self.as_user(self.writer)
+        people = {p["username"] for p in self.client.get("/api/team/reviews/people/?month=2026-09").json()["people"]}
+        self.assertEqual(people, {"pm", "hr", "sales", "sup", "salesmgr", "writer2"})
+        for subject in [self.production, self.supervisor, self.writer2, self.sales_manager, self.hr]:
+            self.assertEqual(self.review(subject, comment="Helpful").status_code, 201, subject.username)
+
+    def test_sales_manager_reviews_too(self):
+        self.as_user(self.sales_manager)
+        for subject in [self.production, self.supervisor, self.writer, self.hr]:
+            self.assertEqual(self.review(subject).status_code, 201)
+
+    def test_one_review_per_person_per_month(self):
+        self.as_user(self.writer)
+        self.assertEqual(self.review(self.production, rating=3).status_code, 201)
+        response = self.review(self.production, rating=5, comment="Better now")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["rating"], 5)
+        self.assertEqual(self.review(self.production, month="2026-08").status_code, 201)
+        mine = self.client.get("/api/team/reviews/people/?month=2026-09").json()["people"]
+        pm = next(p for p in mine if p["username"] == "pm")
+        self.assertEqual(pm["my_review"]["comment"], "Better now")
+
+    def test_rules(self):
+        self.as_user(self.writer)
+        self.assertEqual(self.review(self.writer).status_code, 400)  # yourself
+        self.assertEqual(self.review(self.dev).status_code, 400)  # another unit
+        self.assertEqual(self.review(self.production, rating=6).status_code, 400)
+        self.assertEqual(self.review(self.production, month="2099-01").status_code, 400)
+        for outsider in [self.dev, self.head_hr, self.boss]:
+            self.as_user(outsider)
+            self.assertEqual(self.review(self.writer).status_code, 403, outsider.username)
+
+    def test_only_the_author_withdraws_a_review(self):
+        self.as_user(self.writer)
+        review_id = self.review(self.production).json()["id"]
+        self.as_user(self.writer2)
+        self.assertEqual(self.client.delete(f"/api/team/reviews/{review_id}/").status_code, 403)
+        self.as_user(self.writer)
+        self.assertEqual(self.client.delete(f"/api/team/reviews/{review_id}/").status_code, 204)
+
+    def test_who_reads_reviews(self):
+        self.as_user(self.writer)
+        self.review(self.production, rating=2, comment="Late feedback")
+        self.review(self.supervisor, rating=5)
+        self.as_user(self.writer2)
+        self.review(self.supervisor, rating=4)
+
+        for reader in [self.boss, self.hr]:
+            self.as_user(reader)
+            rows = {p["username"]: p for p in self.client.get("/api/team/reviews/summary/?month=2026-09").json()["people"]}
+            self.assertEqual(rows["sup"]["average"], 4.5)
+            self.assertEqual(rows["pm"]["reviews"][0]["comment"], "Late feedback")
+            self.assertEqual(rows["pm"]["reviews"][0]["author"]["username"], "writer")
+
+        # The Production Manager reads everyone's reviews except the ones about themselves.
+        self.as_user(self.production)
+        rows = {p["username"] for p in self.client.get("/api/team/reviews/summary/?month=2026-09").json()["people"]}
+        self.assertNotIn("pm", rows)
+        self.assertIn("sup", rows)
+
+        for user in [self.writer, self.supervisor, self.sales_manager, self.dev, self.head_hr]:
+            self.as_user(user)
+            self.assertEqual(self.client.get("/api/team/reviews/summary/").status_code, 403, user.username)

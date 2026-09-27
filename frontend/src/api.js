@@ -93,5 +93,9 @@ export const teamApi = {
   },
   sendChat: (to, body) => request('/chat/messages/', { method: 'POST', body: { to: to === 'team' ? null : Number(to), body } }),
   markChatRead: (withId, lastId) => request('/chat/read/', { method: 'POST', body: { with: withId, last_id: lastId } }),
+  reviewPeople: (month) => request(`/team/reviews/people/?month=${month}`),
+  writeReview: (data) => request('/team/reviews/', { method: 'POST', body: data }),
+  withdrawReview: (id) => request(`/team/reviews/${id}/`, { method: 'DELETE' }),
+  reviewSummary: (month) => request(`/team/reviews/summary/?month=${month}`),
   chatUpdates: (after) => request(`/chat/updates/${after ? `?after=${after}` : ''}`),
 }

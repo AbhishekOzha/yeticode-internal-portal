@@ -118,6 +118,8 @@ ROLES = [
      ["view_unit_directory", "write_content"]),
     (CONTENT, "content_writer_research_specialist", "Content Writer & Research Specialist", 2,
      ["view_unit_directory", "write_content", "conduct_research"]),
+    (CONTENT, "supervisor", "Supervisor", 2,
+     ["view_unit_directory", "review_content"]),
     (CONTENT, "production_manager", "Production Manager", 3,
      ["view_unit_directory", "review_content", "manage_production", "manage_unit_users",
       "manage_payroll"]),

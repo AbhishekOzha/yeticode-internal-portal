@@ -9,6 +9,7 @@ import {
   MoonOutlined,
   SafetyCertificateOutlined,
   SettingOutlined,
+  StarOutlined,
   SunOutlined,
   TeamOutlined,
   UserOutlined,
@@ -31,9 +32,10 @@ import OfficeHours from './pages/OfficeHours'
 import Payroll from './pages/Payroll'
 import { canManagePayroll } from './payroll'
 import Profile from './pages/Profile'
+import Reviews from './pages/Reviews'
 import Roles from './pages/Roles'
 import Users from './pages/Users'
-import { canManageOfficeHours, inTeam, useChat } from './team'
+import { canManageOfficeHours, canReadReviews, inTeam, useChat } from './team'
 import { useThemeMode } from './themeMode'
 
 const { Sider, Header, Content } = Layout
@@ -48,6 +50,8 @@ function pagesFor(user) {
   if (directory) pages.push({ key: 'directory', label: directory, icon: <TeamOutlined />, Component: Directory })
   if (inTeam(user)) pages.push({ key: 'chat', label: 'Team chat', icon: <MessageOutlined />, Component: Chat })
   if (user.can_manage_users) pages.push({ key: 'users', label: 'Users', icon: <UsergroupAddOutlined />, Component: Users })
+  if (inTeam(user) || canReadReviews(user))
+    pages.push({ key: 'reviews', label: 'Reviews', icon: <StarOutlined />, Component: Reviews })
   if (canManageOfficeHours(user))
     pages.push({ key: 'office-hours', label: 'Office hours', icon: <ClockCircleOutlined />, Component: OfficeHours })
   if (canManagePayroll(user)) pages.push({ key: 'payroll', label: 'Payroll', icon: <WalletOutlined />, Component: Payroll })
