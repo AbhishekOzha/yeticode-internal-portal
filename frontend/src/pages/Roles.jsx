@@ -4,14 +4,14 @@ import { App, Button, Card, Checkbox, Col, Flex, Row, Skeleton, Tabs, Tag, Toolt
 import { api } from '../api'
 import { unitColor } from '../colors'
 
-// Show a unit's own capability group first, then the shared ones.
+// Each role only sees the shared groups and its own unit's group; company-wide
+// roles see just the shared ones. Other units' permissions are never offered.
 const GROUP_ORDER = ['General', 'Web App Development', 'Training', 'Academic Content Writing', 'HR']
 
 function RoleCard({ role, capabilities, onSaved }) {
   const { message } = App.useApp()
   const [selected, setSelected] = useState(() => new Set(role.capabilities))
   const [busy, setBusy] = useState(false)
-  const [showAll, setShowAll] = useState(false)
   const companyWide = role.unit_id === null
   const dirty = selected.size !== role.capabilities.length || role.capabilities.some((c) => !selected.has(c))
 
@@ -21,10 +21,9 @@ function RoleCard({ role, capabilities, onSaved }) {
       if (!byGroup.has(cap.group)) byGroup.set(cap.group, [])
       byGroup.get(cap.group).push(cap)
     }
-    const relevant = (group) =>
-      showAll || group === 'General' || group === 'HR' || group === role.unit || byGroup.get(group).some((c) => selected.has(c.code))
+    const relevant = (group) => group === 'General' || group === 'HR' || (!companyWide && group === role.unit)
     return GROUP_ORDER.filter((g) => byGroup.has(g) && relevant(g)).map((g) => [g, byGroup.get(g)])
-  }, [capabilities, showAll, role.unit, selected])
+  }, [capabilities, companyWide, role.unit])
 
   function toggle(code, checked) {
     setSelected((current) => {
@@ -98,9 +97,6 @@ function RoleCard({ role, capabilities, onSaved }) {
             </Flex>
           </div>
         ))}
-        <Button type="link" size="small" style={{ alignSelf: 'flex-start', padding: 0 }} onClick={() => setShowAll((s) => !s)}>
-          {showAll ? 'Show relevant permissions only' : 'Show permissions from other units'}
-        </Button>
       </Flex>
     </Card>
   )

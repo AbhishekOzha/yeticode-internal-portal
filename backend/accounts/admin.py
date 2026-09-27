@@ -4,7 +4,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.contrib.auth.models import Group
 
-from .models import Role, Unit, User, check_role_capabilities
+from .models import CompanySettings, Role, Unit, User, check_role_capabilities
 
 # Access comes from roles, so groups would only be a second, confusing source.
 admin.site.unregister(Group)
@@ -107,7 +107,7 @@ class UserAdmin(BaseUserAdmin):
     ordering = ["username"]
     fieldsets = [
         (None, {"fields": ["username", "password"]}),
-        ("Personal info", {"fields": ["first_name", "last_name", "email"]}),
+        ("Personal info", {"fields": ["first_name", "last_name", "email", "secondary_email", "avatar"]}),
         (
             "Access",
             {
@@ -147,3 +147,14 @@ class UserAdmin(BaseUserAdmin):
         if obj.is_superuser:
             return "All units (Super Admin)"
         return obj.unit or "All units"
+
+
+@admin.register(CompanySettings)
+class CompanySettingsAdmin(admin.ModelAdmin):
+    """A single row; the app's Company settings page edits the same thing."""
+
+    def has_add_permission(self, request):
+        return not CompanySettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False

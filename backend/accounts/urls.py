@@ -15,6 +15,9 @@ urlpatterns = [
     path("auth/login/", views.LoginView.as_view(), name="login"),
     path("auth/logout/", views.LogoutView.as_view(), name="logout"),
     path("auth/me/", views.MeView.as_view(), name="me"),
+    path("profile/", views.ProfileView.as_view(), name="profile"),
+    path("branding/", views.BrandingView.as_view(), name="branding"),
+    path("manage/company/", views.CompanySettingsView.as_view(), name="manage-company"),
     path("unit/members/", views.UnitMembersView.as_view(), name="unit-members"),
     path("company/members/", views.CompanyMembersView.as_view(), name="company-members"),
 ] + router.urls

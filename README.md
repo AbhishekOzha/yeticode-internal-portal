@@ -57,8 +57,16 @@ production the command refuses to run without them.
 ```bash
 cd frontend
 npm install
-npm run dev                             # http://localhost:5173 (proxies /api and /admin to :8000)
+npm run dev                             # http://localhost:5173 (proxies /api, /admin and /media to :8000)
 ```
+
+### Uploads
+
+Profile photos and the company logo are stored under `backend/media/` (set
+`MEDIA_ROOT` to change it; git ignores the folder). Images must be PNG, JPG or
+WebP and at most 2 MB; SVG is refused because it can carry scripts. Django
+serves `/media/` only while `DEBUG` is on, so in production serve `MEDIA_ROOT`
+from your web server.
 
 Run the backend tests with `python manage.py test accounts` (needs the `CREATEDB` permission above).
 
@@ -73,6 +81,8 @@ Run the backend tests with `python manage.py test accounts` (needs the `CREATEDB
 | Super Admin | `is_superuser`. The only users allowed into `/admin/`; they have every permission and no role. |
 | Capabilities | Django permissions `accounts.<codename>`, defined in `accounts/rbac.py` and checked with `user.has_perm(...)`, or `has_capability(...)` in DRF views. |
 | Dashboards | `/api/auth/me/` returns one dashboard widget per capability; the React app renders them. |
+| Profiles | Everyone has a **My profile** page (user menu): they can upload their own photo and add, change or remove one secondary email. The primary email is the sign-in address; only Super Admins, or unit admins for other people in their unit, can change it, and it can never be blank. When a username was the email, it follows the new email. |
+| Company branding | `CompanySettings` (a single row): name, tagline, contact details and logo. Only Super Admins edit it, on the **Company settings** page. The logo replaces the built-in mark in the sidebar, on the sign-in page and as the tab icon. |
 
 The starting capabilities for each role are in `accounts/rbac.py`. They are
 applied only when a role is first created, so a Super Admin can change them
@@ -110,8 +120,11 @@ cards are placeholders for the features each unit will need.
 | `POST /api/auth/login/` | Session login, returns the current user |
 | `POST /api/auth/logout/` | Ends the session |
 | `GET /api/auth/me/` | Current user, unit, role, capabilities, dashboard |
+| `GET/PATCH /api/profile/` | Your own `avatar` (multipart upload, or `null` to remove) and `secondary_email`. The primary email is refused here. |
+| `GET /api/branding/` | Company name, tagline and logo. Public, for the sign-in page. |
+| `GET/PATCH /api/manage/company/` | Company details and `logo` (Super Admins only) |
 | `GET /api/unit/members/` | People in your unit (needs `view_unit_directory`) |
 | `GET /api/company/members/` | Everyone in every unit (company-wide roles with `view_all_employee_records`) |
-| `GET/POST /api/manage/users/`, `GET/PATCH /api/manage/users/<id>/` | List, create, edit, deactivate and reset passwords. Super Admins: all users. `manage_unit_users`: own unit, own unit's roles only. No DELETE; deactivate instead. |
+| `GET/POST /api/manage/users/`, `GET/PATCH /api/manage/users/<id>/` | List, create, edit (including primary and secondary email), deactivate and reset passwords. Super Admins: all users. `manage_unit_users`: own unit, own unit's roles only. No DELETE; deactivate instead. |
 | `GET /api/manage/roles/`, `PATCH /api/manage/roles/<id>/` | List roles (unit admins see their unit's); Super Admins edit a role's `capabilities` |
 | `GET /api/manage/capabilities/` | The capability catalog (Super Admins) |

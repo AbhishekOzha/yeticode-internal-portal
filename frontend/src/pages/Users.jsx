@@ -72,6 +72,7 @@ function UserDrawer({ open, user, roles, currentUser, onClose, onSaved }) {
   const [busy, setBusy] = useState(false)
   const isNew = !user
   const isSelf = user?.id === currentUser.id
+  const ownEmailLocked = isSelf && !currentUser.is_super_admin
 
   useEffect(() => {
     if (!open) return
@@ -79,6 +80,7 @@ function UserDrawer({ open, user, roles, currentUser, onClose, onSaved }) {
     if (user) {
       form.setFieldsValue({
         email: user.email,
+        secondary_email: user.secondary_email,
         username: user.username,
         first_name: user.first_name,
         last_name: user.last_name,
@@ -110,6 +112,7 @@ function UserDrawer({ open, user, roles, currentUser, onClose, onSaved }) {
     setBusy(true)
     const payload = {
       email: values.email.trim(),
+      secondary_email: (values.secondary_email || '').trim(),
       username: (values.username || values.email).trim(),
       first_name: values.first_name.trim(),
       last_name: (values.last_name || '').trim(),
@@ -156,12 +159,32 @@ function UserDrawer({ open, user, roles, currentUser, onClose, onSaved }) {
           </Col>
         </Row>
         <Form.Item
-          label="Work email"
+          label="Primary email"
           name="email"
-          extra="They sign in with this email."
+          extra={
+            ownEmailLocked
+              ? 'Ask a Super Admin to change your own primary email.'
+              : 'They sign in with this email. It is required.'
+          }
           rules={[{ required: true, type: 'email', message: 'Enter a valid email address' }]}
         >
-          <Input placeholder="name@yeticode.com" autoComplete="off" />
+          <Input placeholder="name@yeticode.com" autoComplete="off" disabled={ownEmailLocked} />
+        </Form.Item>
+        <Form.Item
+          label="Secondary email"
+          name="secondary_email"
+          extra="Optional. People can also add or change this themselves on their profile."
+          rules={[
+            { type: 'email', message: 'Enter a valid email address' },
+            ({ getFieldValue }) => ({
+              validator: (_, value) =>
+                value && value.trim().toLowerCase() === (getFieldValue('email') || '').trim().toLowerCase()
+                  ? Promise.reject(new Error('Use a different address from the primary email'))
+                  : Promise.resolve(),
+            }),
+          ]}
+        >
+          <Input placeholder="personal@example.com" autoComplete="off" allowClear />
         </Form.Item>
         {!isNew && user?.username !== user?.email && (
           <Form.Item label="Username" name="username" extra="Older accounts may also sign in with a username.">

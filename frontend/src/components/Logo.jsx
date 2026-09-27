@@ -1,7 +1,21 @@
-// Brand mark: two snow-capped peaks inside a rounded tile.
+import { useBranding } from '../branding'
+
+// The uploaded company logo, or the built-in mark: two snow-capped peaks inside a rounded tile.
 export function LogoMark({ size = 36 }) {
+  const { branding } = useBranding()
+  if (branding.logo) {
+    return (
+      <img
+        src={branding.logo}
+        alt={branding.name}
+        width={size}
+        height={size}
+        style={{ borderRadius: size * 0.28, objectFit: 'contain', background: '#fff', flexShrink: 0 }}
+      />
+    )
+  }
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" role="img" aria-label="Yeticode Innovations">
+    <svg width={size} height={size} viewBox="0 0 40 40" role="img" aria-label={branding.name} style={{ flexShrink: 0 }}>
       <defs>
         <linearGradient id="yc-tile" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#5c7cfa" />
@@ -15,16 +29,31 @@ export function LogoMark({ size = 36 }) {
   )
 }
 
+// First word large, the rest small and spaced, e.g. "Yeticode / INNOVATIONS".
 export function Logo({ collapsed = false, light = true }) {
+  const { branding } = useBranding()
+  const [first, ...rest] = branding.name.trim().split(/\s+/)
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
       <LogoMark />
       {!collapsed && (
-        <div style={{ lineHeight: 1.1, color: light ? '#fff' : 'inherit' }}>
-          <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em' }}>Yeticode</div>
-          <div style={{ fontSize: 11, opacity: 0.65, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
-            Innovations
-          </div>
+        <div style={{ lineHeight: 1.1, color: light ? '#fff' : 'inherit', minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em' }}>{first}</div>
+          {rest.length > 0 && (
+            <div
+              style={{
+                fontSize: 11,
+                opacity: 0.65,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {rest.join(' ')}
+            </div>
+          )}
         </div>
       )}
     </div>

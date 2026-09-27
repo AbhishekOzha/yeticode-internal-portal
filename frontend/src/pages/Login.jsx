@@ -3,6 +3,7 @@ import { LockOutlined, MailOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Flex, Form, Input, Typography } from 'antd'
 import { api } from '../api'
 import { LogoMark } from '../components/Logo'
+import { useBranding } from '../branding'
 import { UNIT_COLORS } from '../colors'
 
 const UNITS = [
@@ -12,6 +13,7 @@ const UNITS = [
 ]
 
 function BrandPanel() {
+  const { branding } = useBranding()
   return (
     <div className="login-brand">
       <svg className="login-peaks" viewBox="0 0 800 300" preserveAspectRatio="none" aria-hidden="true">
@@ -21,12 +23,16 @@ function BrandPanel() {
       <Flex align="center" gap={14}>
         <LogoMark size={44} />
         <div>
-          <div style={{ fontWeight: 700, fontSize: 22 }}>Yeticode Innovations</div>
-          <div style={{ opacity: 0.7, fontSize: 13, letterSpacing: '0.12em', textTransform: 'uppercase' }}>Staff portal</div>
+          <div style={{ fontWeight: 700, fontSize: 22 }}>{branding.name}</div>
+          {branding.tagline && (
+            <div style={{ opacity: 0.7, fontSize: 13, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+              {branding.tagline}
+            </div>
+          )}
         </div>
       </Flex>
       <div style={{ marginTop: 'auto', position: 'relative' }}>
-        <h1 className="login-headline">One workspace for every team at Yeticode.</h1>
+        <h1 className="login-headline">One workspace for every team at {branding.name.split(/\s+/)[0]}.</h1>
         <p style={{ opacity: 0.8, fontSize: 16, maxWidth: 440 }}>
           Sign in to see the tools and people for your role, in your unit.
         </p>
@@ -47,6 +53,7 @@ function BrandPanel() {
 }
 
 export default function Login({ onLogin }) {
+  const { branding } = useBranding()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -71,7 +78,7 @@ export default function Login({ onLogin }) {
         <Card variant="borderless" className="login-card">
           <Flex className="login-mobile-logo" align="center" gap={10}>
             <LogoMark size={36} />
-            <Typography.Text strong style={{ fontSize: 17 }}>Yeticode Innovations</Typography.Text>
+            <Typography.Text strong style={{ fontSize: 17 }}>{branding.name}</Typography.Text>
           </Flex>
           <Typography.Title level={2} style={{ marginBottom: 4 }}>Welcome back</Typography.Title>
           <Typography.Paragraph type="secondary" style={{ marginBottom: 28 }}>

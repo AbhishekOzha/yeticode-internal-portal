@@ -6,8 +6,10 @@ import {
   MenuUnfoldOutlined,
   MoonOutlined,
   SafetyCertificateOutlined,
+  SettingOutlined,
   SunOutlined,
   TeamOutlined,
+  UserOutlined,
   UsergroupAddOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Flex, Layout, Menu, Spin, Tooltip, Typography, Grid } from 'antd'
@@ -15,9 +17,11 @@ import { api } from './api'
 import { Logo } from './components/Logo'
 import { PersonAvatar } from './components/People'
 import { displayName } from './people'
+import CompanySettings from './pages/CompanySettings'
 import Dashboard from './pages/Dashboard'
 import Directory from './pages/Directory'
 import Login from './pages/Login'
+import Profile from './pages/Profile'
 import Roles from './pages/Roles'
 import Users from './pages/Users'
 import { useThemeMode } from './themeMode'
@@ -35,6 +39,10 @@ function pagesFor(user) {
   if (user.can_manage_users) pages.push({ key: 'users', label: 'Users', icon: <UsergroupAddOutlined />, Component: Users })
   if (user.can_manage_roles)
     pages.push({ key: 'roles', label: 'Roles & permissions', icon: <SafetyCertificateOutlined />, Component: Roles })
+  if (user.is_super_admin)
+    pages.push({ key: 'company', label: 'Company settings', icon: <SettingOutlined />, Component: CompanySettings })
+  // Reached from the user menu rather than the sidebar.
+  pages.push({ key: 'profile', label: 'My profile', icon: <UserOutlined />, Component: Profile, hidden: true })
   return pages
 }
 
@@ -54,7 +62,7 @@ function scopeLabel(user) {
   return `${user.role.name} · ${user.unit ? user.unit.name : 'All units'}`
 }
 
-function Shell({ user, onLogout }) {
+function Shell({ user, onUserChange, onLogout }) {
   const { dark, toggle } = useThemeMode()
   const screens = Grid.useBreakpoint()
   const [collapsed, setCollapsed] = useState(false)
@@ -68,7 +76,7 @@ function Shell({ user, onLogout }) {
       theme="dark"
       mode="inline"
       selectedKeys={[page.key]}
-      items={pages.map((p) => ({ key: p.key, icon: p.icon, label: p.label }))}
+      items={pages.filter((p) => !p.hidden).map((p) => ({ key: p.key, icon: p.icon, label: p.label }))}
       onClick={({ key }) => {
         window.location.hash = key
         if (narrow) setCollapsed(true)
@@ -137,9 +145,15 @@ function Shell({ user, onLogout }) {
                     ),
                   },
                   { type: 'divider' },
+                  { key: 'profile', icon: <UserOutlined />, label: 'My profile' },
+                  ...(user.is_super_admin ? [{ key: 'company', icon: <SettingOutlined />, label: 'Company settings' }] : []),
+                  { type: 'divider' },
                   { key: 'logout', icon: <LogoutOutlined />, label: 'Sign out', danger: true },
                 ],
-                onClick: ({ key }) => key === 'logout' && onLogout(),
+                onClick: ({ key }) => {
+                  if (key === 'logout') onLogout()
+                  else window.location.hash = key
+                },
               }}
             >
               <Button type="text" className="user-button">
@@ -150,7 +164,7 @@ function Shell({ user, onLogout }) {
           </Flex>
         </Header>
         <Content className="app-content">
-          <page.Component user={user} />
+          <page.Component user={user} onUserChange={onUserChange} />
         </Content>
       </Layout>
     </Layout>
@@ -184,5 +198,5 @@ export default function App() {
     )
   }
   if (!user) return <Login onLogin={setUser} />
-  return <Shell user={user} onLogout={handleLogout} />
+  return <Shell user={user} onUserChange={setUser} onLogout={handleLogout} />
 }

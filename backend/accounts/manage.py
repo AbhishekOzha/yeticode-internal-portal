@@ -12,7 +12,9 @@ from rest_framework import mixins, serializers, viewsets
 from rest_framework.permissions import BasePermission
 
 from .dashboard import can_manage_users
-from .models import Role, User, check_role_capabilities
+from .models import Role, User, check_role_capabilities, email_in_use
+from .permissions import IsSuperAdmin
+from .serializers import ImageUrlField
 from .rbac import CAPABILITIES, CAPABILITY_GROUPS, CROSS_UNIT_CAPABILITIES
 
 
@@ -21,13 +23,6 @@ class CanManageUsers(BasePermission):
 
     def has_permission(self, request, view):
         return can_manage_users(request.user)
-
-
-class IsSuperAdmin(BasePermission):
-    message = "Only Super Admins can do this."
-
-    def has_permission(self, request, view):
-        return request.user.is_superuser
 
 
 def unit_label(unit):
@@ -45,11 +40,12 @@ class ManagedUserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True, required=False, allow_blank=False, trim_whitespace=False
     )
+    avatar = ImageUrlField(read_only=True)
 
     class Meta:
         model = User
         fields = [
-            "id", "username", "first_name", "last_name", "email",
+            "id", "username", "first_name", "last_name", "email", "secondary_email", "avatar",
             "role", "role_name", "unit", "unit_code", "is_super_admin", "is_active",
             "password", "last_login", "date_joined",
         ]
@@ -87,6 +83,8 @@ class ManagedUserSerializer(serializers.ModelSerializer):
             if "role" in attrs and attrs["role"] != instance.role or is_super != instance.is_superuser:
                 raise serializers.ValidationError({"role": "You cannot change your own access."})
 
+        self.validate_emails(attrs, actor)
+
         password = attrs.get("password")
         if instance is None and not password:
             raise serializers.ValidationError({"password": "Set a password for the new account."})
@@ -102,6 +100,45 @@ class ManagedUserSerializer(serializers.ModelSerializer):
             except DjangoValidationError as exc:
                 raise serializers.ValidationError({"password": list(exc.messages)})
         return attrs
+
+    def validate_emails(self, attrs, actor):
+        """The primary email is the sign-in address: required, unique, and kept in the username."""
+        instance = self.instance
+        if "email" in attrs:
+            email = attrs["email"] = attrs["email"].strip()
+            if not email:
+                raise serializers.ValidationError({"email": "Every account needs a primary email."})
+            changed = instance is None or email.lower() != (instance.email or "").lower()
+            if changed and email_in_use(email, exclude=instance):
+                raise serializers.ValidationError({"email": "Another account already uses this email."})
+            if changed and instance is not None and instance.pk == actor.pk and not actor.is_superuser:
+                raise serializers.ValidationError(
+                    {"email": "Ask a Super Admin to change your own primary email."}
+                )
+            # Accounts whose username is their email keep the two in step.
+            if (
+                instance is not None
+                and instance.username.lower() == (instance.email or "").lower()
+                and attrs.get("username", instance.username) == instance.username
+            ):
+                attrs["username"] = email
+        email = attrs.get("email", instance.email if instance else "")
+
+        if "secondary_email" in attrs:
+            secondary = attrs["secondary_email"] = attrs["secondary_email"].strip()
+            if secondary and secondary.lower() == (email or "").lower():
+                raise serializers.ValidationError(
+                    {"secondary_email": "The secondary email must differ from the primary email."}
+                )
+            if secondary and email_in_use(secondary, exclude=instance):
+                raise serializers.ValidationError({"secondary_email": "Another account already uses this email."})
+
+        username = attrs.get("username")
+        if username and User.objects.exclude(pk=instance.pk if instance else None).filter(
+            username__iexact=username
+        ).exists():
+            field = "email" if username == email else "username"
+            raise serializers.ValidationError({field: "Another account already uses this sign-in name."})
 
     def create(self, validated_data):
         password = validated_data.pop("password")

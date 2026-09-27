@@ -23,17 +23,19 @@ export class ApiError extends Error {
   }
 }
 
+// A FormData body is sent as multipart (for file uploads); anything else as JSON.
 async function request(path, { method = 'GET', body } = {}) {
   const headers = { Accept: 'application/json' }
+  const multipart = body instanceof FormData
   if (method !== 'GET') {
-    headers['Content-Type'] = 'application/json'
+    if (!multipart) headers['Content-Type'] = 'application/json'
     headers['X-CSRFToken'] = getCookie('csrftoken') ?? ''
   }
   const response = await fetch(`/api${path}`, {
     method,
     headers,
     credentials: 'same-origin',
-    body: body ? JSON.stringify(body) : undefined,
+    body: body ? (multipart ? body : JSON.stringify(body)) : undefined,
   })
   if (response.status === 204) return null
   const data = await response.json().catch(() => ({}))
@@ -47,6 +49,8 @@ export const api = {
   login: (username, password) =>
     request('/auth/login/', { method: 'POST', body: { username, password } }),
   logout: () => request('/auth/logout/', { method: 'POST' }),
+  branding: () => request('/branding/'),
+  updateProfile: (data) => request('/profile/', { method: 'PATCH', body: data }),
   unitMembers: () => request('/unit/members/'),
   companyMembers: () => request('/company/members/'),
 
@@ -56,4 +60,13 @@ export const api = {
   listRoles: () => request('/manage/roles/'),
   updateRole: (id, data) => request(`/manage/roles/${id}/`, { method: 'PATCH', body: data }),
   listCapabilities: () => request('/manage/capabilities/'),
+  companySettings: () => request('/manage/company/'),
+  updateCompanySettings: (data) => request('/manage/company/', { method: 'PATCH', body: data }),
+}
+
+// Wraps a single file in FormData for an upload field such as `avatar` or `logo`.
+export function fileForm(field, file) {
+  const data = new FormData()
+  data.append(field, file)
+  return data
 }

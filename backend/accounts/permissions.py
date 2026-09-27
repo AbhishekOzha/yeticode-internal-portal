@@ -22,3 +22,10 @@ class IsCompanyWide(BasePermission):
     def has_permission(self, request, view):
         user = request.user
         return user.is_superuser or (user.role_id is not None and user.role.unit_id is None)
+
+
+class IsSuperAdmin(BasePermission):
+    message = "Only Super Admins can do this."
+
+    def has_permission(self, request, view):
+        return request.user.is_superuser

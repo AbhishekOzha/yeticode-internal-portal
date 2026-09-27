@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from .rbac import CAPABILITIES, CROSS_UNIT_CAPABILITIES
+from .uploads import avatar_upload_to, logo_upload_to, validate_image
 
 
 class Unit(models.Model):
@@ -109,6 +110,13 @@ class User(AbstractUser):
         related_name="users",
         help_text="Required for everyone except Super Admins. The role decides the unit.",
     )
+    secondary_email = models.EmailField(
+        blank=True, help_text="An optional second address. People sign in with their primary email."
+    )
+    avatar = models.ImageField(
+        upload_to=avatar_upload_to, blank=True, validators=[validate_image],
+        help_text="Profile photo: PNG, JPG or WebP, up to 2 MB.",
+    )
 
     objects = UserManager()
 
@@ -143,3 +151,45 @@ class User(AbstractUser):
         # Only Super Admins may sign in to the Django admin.
         self.is_staff = self.is_superuser
         super().save(*args, **kwargs)
+
+
+def email_in_use(email, exclude=None):
+    """True when another account already uses this address as its primary or secondary email."""
+    others = User.objects.all()
+    if exclude is not None and exclude.pk:
+        others = others.exclude(pk=exclude.pk)
+    return others.filter(
+        models.Q(email__iexact=email) | models.Q(secondary_email__iexact=email)
+    ).exists()
+
+
+class CompanySettings(models.Model):
+    """The company's name, contact details and logo. There is only ever one row."""
+
+    name = models.CharField(max_length=120, default="Yeticode Innovations")
+    tagline = models.CharField(max_length=120, blank=True, default="Staff portal")
+    email = models.EmailField("contact email", blank=True)
+    phone = models.CharField(max_length=40, blank=True)
+    website = models.URLField(blank=True)
+    address = models.TextField(blank=True)
+    logo = models.ImageField(
+        upload_to=logo_upload_to, blank=True, validators=[validate_image],
+        help_text="PNG, JPG or WebP, up to 2 MB. A square image works best.",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "company settings"
+        verbose_name_plural = "company settings"
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        settings, _ = cls.objects.get_or_create(pk=1)
+        return settings

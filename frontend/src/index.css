@@ -123,3 +123,6 @@ html[data-theme='dark'] .app-header { border-bottom-color: rgba(255, 255, 255, 0
   .login-brand { display: none; }
   .login-mobile-logo { display: flex !important; }
 }
+
+/* Company settings: the logo as it appears in the sidebar */
+.brand-preview { padding: 16px 20px; border-radius: 12px; background: #0f1733; }

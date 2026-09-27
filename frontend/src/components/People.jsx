@@ -5,7 +5,12 @@ import { colorFor, displayName, initials } from '../people'
 export function PersonAvatar({ person, size = 36 }) {
   const name = displayName(person)
   return (
-    <Avatar size={size} style={{ background: colorFor(name), fontWeight: 600, flexShrink: 0 }}>
+    <Avatar
+      size={size}
+      src={person.avatar || undefined}
+      alt={name}
+      style={{ background: person.avatar ? undefined : colorFor(name), fontWeight: 600, flexShrink: 0 }}
+    >
       {initials(name)}
     </Avatar>
   )

@@ -6,13 +6,16 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import User
-from .permissions import IsCompanyWide, has_capability
+from .models import CompanySettings, User
+from .permissions import IsCompanyWide, IsSuperAdmin, has_capability
 from .serializers import (
+    BrandingSerializer,
     CompanyMemberSerializer,
+    CompanySettingsSerializer,
     CurrentUserSerializer,
     LoginSerializer,
     MemberSerializer,
+    ProfileSerializer,
 )
 
 
@@ -64,6 +67,43 @@ class MeView(APIView):
 
     def get(self, request):
         return Response(CurrentUserSerializer(request.user).data)
+
+
+class ProfileView(APIView):
+    """People edit their own photo and secondary email. Returns the same shape as /auth/me/."""
+
+    def get(self, request):
+        return Response(CurrentUserSerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = ProfileSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(CurrentUserSerializer(user).data)
+
+
+class BrandingView(APIView):
+    """Company name and logo. Public, because the sign-in page shows them."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response(BrandingSerializer(CompanySettings.load()).data)
+
+
+class CompanySettingsView(APIView):
+    """Company details and logo, editable by Super Admins only."""
+
+    permission_classes = [IsSuperAdmin]
+
+    def get(self, request):
+        return Response(CompanySettingsSerializer(CompanySettings.load()).data)
+
+    def patch(self, request):
+        serializer = CompanySettingsSerializer(CompanySettings.load(), data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class UnitMembersView(generics.ListAPIView):
