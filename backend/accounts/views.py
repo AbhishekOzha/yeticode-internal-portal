@@ -46,7 +46,8 @@ class LoginView(APIView):
             if match:
                 user = authenticate(request, username=match.username, password=password)
         if user is None and "@" in typed:
-            match = User.objects.filter(email__iexact=typed).exclude(email="")
+            # Deactivated accounts can't sign in, so they don't make an email ambiguous.
+            match = User.objects.filter(email__iexact=typed, is_active=True).exclude(email="")
             if match.count() == 1:
                 user = authenticate(request, username=match.get().username, password=password)
         if user is None:

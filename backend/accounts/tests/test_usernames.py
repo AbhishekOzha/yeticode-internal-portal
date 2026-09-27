@@ -68,3 +68,12 @@ class UsernameTests(TestCase):
         self.assertEqual(slugify_username("paulozajr@gmail.com"), "paulozajr")
         self.assertEqual(slugify_username("abhishekojha.work@gmail.com"), "abhishekojha.work")
         self.assertEqual(unique_username("abc", {"abc", "abc2"}), "abc3")
+
+
+    def test_email_sign_in_ignores_deactivated_accounts_with_the_same_email(self):
+        self.create(username="abhishekojha")
+        User.objects.create_user(username="oldcopy", email="abhishek@gmail.com", password=PASSWORD, is_active=False,
+                                 role=self.writer_role)
+        response = APIClient().post("/api/auth/login/", {"username": "abhishek@gmail.com", "password": PASSWORD}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["username"], "abhishekojha")
