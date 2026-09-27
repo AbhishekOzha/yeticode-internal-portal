@@ -22,7 +22,9 @@ def seed_units_and_roles(app_config, using="default", apps=None, verbosity=1, **
 
     for unit_code, code, name, rank, capabilities in ROLES:
         role, created = Role.objects.using(using).get_or_create(
-            unit=units[unit_code], code=code, defaults={"name": name, "rank": rank}
+            unit=units[unit_code] if unit_code else None,
+            code=code,
+            defaults={"name": name, "rank": rank},
         )
         if created:
             perms = Permission.objects.using(using).filter(

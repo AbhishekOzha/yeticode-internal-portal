@@ -33,8 +33,9 @@ Run the backend tests with `DJANGO_DEBUG=1 python manage.py test accounts`.
 | Concept | Where it lives |
 | --- | --- |
 | Units | `Unit` model: Web App Development, Training, Academic Content Writing |
-| Roles | `Role` model, each belonging to one unit, with a set of capabilities |
+| Roles | `Role` model with a set of capabilities. A role belongs to one unit, or to no unit when it is company-wide (Head HR). |
 | Users | `User.role` (one role). `User.unit` is read from the role, so a user can't hold a role from another unit. A database constraint requires a role for everyone except Super Admins. |
+| Unit isolation | Unit-scoped roles only ever see their own unit. Cross-unit capabilities (`CROSS_UNIT_CAPABILITIES` in `accounts/rbac.py`) can only be given to company-wide roles; the admin form, the model layer and the API each refuse otherwise. |
 | Super Admin | `is_superuser`. The only users allowed into `/admin/`; they have every permission and no role. |
 | Capabilities | Django permissions `accounts.<codename>`, defined in `accounts/rbac.py` and checked with `user.has_perm(...)`, or `has_capability(...)` in DRF views. |
 | Dashboards | `/api/auth/me/` returns one dashboard widget per capability; the React app renders them. |
@@ -51,7 +52,7 @@ afterwards in **Admin → Roles** without a deploy.
 | | Web Developer | unit directory, projects, my tasks |
 | | Senior Web Developer | + code reviews |
 | | Team Lead | + task assignment, team overview |
-| Training | Student | courses, my progress |
+| Training | Student | unit directory, courses, my progress |
 | | Instructor | unit directory, courses, my classes, grading |
 | | Front Desk Coordinator | unit directory, courses, enquiries, enrollments |
 | | Training Manager | unit directory, courses, enquiries, enrollments, batches, training reports |
@@ -60,9 +61,11 @@ afterwards in **Admin → Roles** without a deploy.
 | | Production Manager | unit directory, quality review, production pipeline |
 | | Sales Executive | unit directory, leads & orders |
 | | Sales Manager | + sales reports, sales team |
-| | HR | unit directory, employee records |
+| | HR | unit directory, employee records (Academic Content Writing only) |
+| All units | Head HR | employee records, company-wide employee records (everyone in all three units). No admin panel and cannot create accounts. |
+| All units | Super Admin | everything, plus the admin panel: create accounts, manage units, roles and permissions |
 
-Only the unit directory is a working feature today; the other dashboard
+The unit directory and the company-wide directory are working features today; the other dashboard
 cards are placeholders for the features each unit will need.
 
 ## API
@@ -74,3 +77,4 @@ cards are placeholders for the features each unit will need.
 | `POST /api/auth/logout/` | Ends the session |
 | `GET /api/auth/me/` | Current user, unit, role, capabilities, dashboard |
 | `GET /api/unit/members/` | People in your unit (needs `view_unit_directory`) |
+| `GET /api/company/members/` | Everyone in every unit (company-wide roles with `view_all_employee_records`) |

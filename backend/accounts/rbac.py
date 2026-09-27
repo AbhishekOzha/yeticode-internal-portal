@@ -34,11 +34,21 @@ CAPABILITIES = {
     "view_sales_reports": ("Sales reports", "Revenue and conversion reports for the sales team."),
     "manage_sales_team": ("Sales team", "Targets and performance of sales executives."),
     "manage_employee_records": ("Employee records", "Staff records, onboarding and leave."),
+    # Company-wide (only for roles that are not tied to a unit)
+    "view_all_employee_records": (
+        "Company-wide employee records",
+        "Everyone employed across all three units, with their unit and role.",
+    ),
 }
+
+# Capabilities that reach across units. Only company-wide roles (roles with no
+# unit) may hold them, so unit-scoped roles stay isolated from other units.
+CROSS_UNIT_CAPABILITIES = {"view_all_employee_records"}
 
 WEB = "web"
 TRAINING = "training"
 CONTENT = "content"
+COMPANY_WIDE = None  # Role is not tied to any unit.
 
 UNITS = {
     WEB: "Web App Development",
@@ -47,6 +57,7 @@ UNITS = {
 }
 
 # (unit, role code, role name, rank within unit, default capabilities)
+# A unit of COMPANY_WIDE makes a role that is not tied to any single unit.
 # Rank orders roles from most junior (1) upwards; it is informational.
 ROLES = [
     (WEB, "junior_web_developer", "Junior Web Developer", 1,
@@ -60,7 +71,7 @@ ROLES = [
       "assign_tasks", "manage_dev_team"]),
 
     (TRAINING, "student", "Student", 1,
-     ["view_courses", "view_own_progress"]),
+     ["view_unit_directory", "view_courses", "view_own_progress"]),
     (TRAINING, "instructor", "Instructor", 2,
      ["view_unit_directory", "view_courses", "teach_classes", "grade_students"]),
     (TRAINING, "front_desk_coordinator", "Front Desk Coordinator", 2,
@@ -81,4 +92,7 @@ ROLES = [
      ["view_unit_directory", "manage_leads", "view_sales_reports", "manage_sales_team"]),
     (CONTENT, "hr", "HR", 2,
      ["view_unit_directory", "manage_employee_records"]),
+
+    (COMPANY_WIDE, "head_hr", "Head HR", 1,
+     ["manage_employee_records", "view_all_employee_records"]),
 ]

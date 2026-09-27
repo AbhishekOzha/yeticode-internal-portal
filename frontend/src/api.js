@@ -35,4 +35,5 @@ export const api = {
     request('/auth/login/', { method: 'POST', body: { username, password } }),
   logout: () => request('/auth/logout/', { method: 'POST' }),
   unitMembers: () => request('/unit/members/'),
+  companyMembers: () => request('/company/members/'),
 }

@@ -4,7 +4,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.contrib.auth.models import Group
 
-from .models import Role, Unit, User
+from .models import Role, Unit, User, check_role_capabilities
 
 # Access comes from roles, so groups would only be a second, confusing source.
 admin.site.unregister(Group)
@@ -41,9 +41,21 @@ class UnitAdmin(admin.ModelAdmin):
         return User.objects.filter(role__unit=obj).count()
 
 
+class RoleForm(forms.ModelForm):
+    class Meta:
+        model = Role
+        fields = "__all__"
+
+    def clean(self):
+        cleaned = super().clean()
+        check_role_capabilities(cleaned.get("unit"), cleaned.get("permissions") or [])
+        return cleaned
+
+
 @admin.register(Role)
 class RoleAdmin(admin.ModelAdmin):
-    list_display = ["name", "unit", "rank", "member_count"]
+    form = RoleForm
+    list_display = ["name", "scope", "rank", "member_count"]
     list_filter = ["unit"]
     search_fields = ["name", "unit__name"]
     prepopulated_fields = {"code": ["name"]}
@@ -57,6 +69,10 @@ class RoleAdmin(admin.ModelAdmin):
             )
         return super().formfield_for_manytomany(db_field, request, **kwargs)
 
+    @admin.display(description="Unit", ordering="unit__name")
+    def scope(self, obj):
+        return obj.unit or "All units"
+
     @admin.display(description="Members")
     def member_count(self, obj):
         return obj.users.count()
@@ -64,7 +80,7 @@ class RoleAdmin(admin.ModelAdmin):
 
 class RoleChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
-        return f"{obj.unit.name} — {obj.name}"
+        return f"{obj.unit.name if obj.unit else 'All units'} — {obj.name}"
 
 
 class UserCreationForm(AdminUserCreationForm):
@@ -117,7 +133,9 @@ class UserAdmin(BaseUserAdmin):
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "role":
-            kwargs["queryset"] = Role.objects.select_related("unit")
+            kwargs["queryset"] = Role.objects.select_related("unit").order_by(
+                "unit__name", "rank", "name"
+            )
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     @admin.display(description="Name")
@@ -126,4 +144,6 @@ class UserAdmin(BaseUserAdmin):
 
     @admin.display(description="Unit", ordering="role__unit__name")
     def unit_name(self, obj):
-        return obj.unit or "All units (Super Admin)"
+        if obj.is_superuser:
+            return "All units (Super Admin)"
+        return obj.unit or "All units"

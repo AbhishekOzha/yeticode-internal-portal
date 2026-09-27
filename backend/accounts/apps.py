@@ -8,6 +8,7 @@ class AccountsConfig(AppConfig):
     verbose_name = "Users, units and roles"
 
     def ready(self):
+        from . import signals  # noqa: F401
         from .seed import seed_units_and_roles
 
         post_migrate.connect(seed_units_and_roles, sender=self)

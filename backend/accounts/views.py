@@ -7,8 +7,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import User
-from .permissions import has_capability
-from .serializers import CurrentUserSerializer, LoginSerializer, MemberSerializer
+from .permissions import IsCompanyWide, has_capability
+from .serializers import (
+    CompanyMemberSerializer,
+    CurrentUserSerializer,
+    LoginSerializer,
+    MemberSerializer,
+)
 
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
@@ -58,8 +63,26 @@ class UnitMembersView(generics.ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
+        unit = self.request.user.unit
+        if unit is None:
+            return User.objects.none()
         return (
-            User.objects.filter(is_active=True, role__unit=self.request.user.unit)
+            User.objects.filter(is_active=True, role__unit=unit)
             .select_related("role")
             .order_by("role__rank", "first_name", "username")
+        )
+
+
+class CompanyMembersView(generics.ListAPIView):
+    """Everyone employed across all units. For company-wide roles such as Head HR."""
+
+    serializer_class = CompanyMemberSerializer
+    permission_classes = [IsCompanyWide, has_capability("view_all_employee_records")]
+    pagination_class = None
+
+    def get_queryset(self):
+        return (
+            User.objects.filter(is_active=True, is_superuser=False)
+            .select_related("role__unit")
+            .order_by("role__unit__name", "role__rank", "first_name", "username")
         )

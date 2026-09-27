@@ -50,3 +50,13 @@ class MemberSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(style={"input_type": "password"}, trim_whitespace=False)
+
+
+class CompanyMemberSerializer(MemberSerializer):
+    unit = serializers.SerializerMethodField()
+
+    class Meta(MemberSerializer.Meta):
+        fields = MemberSerializer.Meta.fields + ["unit"]
+
+    def get_unit(self, obj):
+        return obj.unit.name if obj.unit else "All units"

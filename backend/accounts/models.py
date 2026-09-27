@@ -2,7 +2,7 @@ from django.contrib.auth.models import AbstractUser, UserManager
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from .rbac import CAPABILITIES
+from .rbac import CAPABILITIES, CROSS_UNIT_CAPABILITIES
 
 
 class Unit(models.Model):
@@ -20,9 +20,20 @@ class Unit(models.Model):
 
 
 class Role(models.Model):
-    """A job role that exists within exactly one unit."""
+    """A job role within one unit, or a company-wide role when unit is empty.
 
-    unit = models.ForeignKey(Unit, on_delete=models.PROTECT, related_name="roles")
+    Company-wide roles (such as Head HR) are the only roles that may hold
+    capabilities reaching across units.
+    """
+
+    unit = models.ForeignKey(
+        Unit,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="roles",
+        help_text="Leave empty only for a company-wide role such as Head HR.",
+    )
     code = models.SlugField(max_length=60)
     name = models.CharField(max_length=100)
     rank = models.PositiveSmallIntegerField(
@@ -40,10 +51,22 @@ class Role(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["unit", "code"], name="unique_role_code_per_unit"),
             models.UniqueConstraint(fields=["unit", "name"], name="unique_role_name_per_unit"),
+            models.UniqueConstraint(
+                fields=["code"], condition=models.Q(unit__isnull=True),
+                name="unique_company_wide_role_code",
+            ),
+            models.UniqueConstraint(
+                fields=["name"], condition=models.Q(unit__isnull=True),
+                name="unique_company_wide_role_name",
+            ),
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.unit.name})"
+        return f"{self.name} ({self.unit.name if self.unit else 'All units'})"
+
+    @property
+    def is_company_wide(self):
+        return self.unit_id is None
 
 
 class Capability(models.Model):
@@ -55,12 +78,27 @@ class Capability(models.Model):
         permissions = [(code, label) for code, (label, _) in CAPABILITIES.items()]
 
 
+def check_role_capabilities(unit, permissions):
+    """Raise if a unit-scoped role would be given a cross-unit capability."""
+    if unit is None:
+        return
+    blocked = sorted(
+        perm.name for perm in permissions
+        if perm.content_type.app_label == "accounts" and perm.codename in CROSS_UNIT_CAPABILITIES
+    )
+    if blocked:
+        raise ValidationError(
+            f"Only company-wide roles can have: {', '.join(blocked)}. "
+            "Units are kept isolated from each other."
+        )
+
+
 class User(AbstractUser):
     """A staff member or student. Accounts are only ever created by a Super Admin.
 
     Every user except a Super Admin has exactly one role, and the role
     determines the user's unit, so a user can never be in one unit with a
-    role from another.
+    role from another. Users with a company-wide role have no unit.
     """
 
     role = models.ForeignKey(

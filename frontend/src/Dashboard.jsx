@@ -1,10 +1,14 @@
-import { UnitDirectory } from './widgets'
+import { CompanyDirectory, UnitDirectory } from './widgets'
 
 // Widgets with a real implementation; every other capability shows a placeholder card.
 const WIDGETS = {
   view_unit_directory: UnitDirectory,
+  view_all_employee_records: CompanyDirectory,
   admin_panel: AdminPanel,
 }
+
+// Widgets that show a table and take the full width.
+const WIDE = new Set(['view_unit_directory', 'view_all_employee_records'])
 
 function AdminPanel() {
   return (
@@ -21,7 +25,7 @@ function Placeholder() {
 export default function Dashboard({ user, onLogout }) {
   const scope = user.is_super_admin
     ? 'Super Admin · All units'
-    : `${user.role.name} · ${user.unit.name}`
+    : `${user.role.name} · ${user.unit ? user.unit.name : 'All units'}`
 
   return (
     <div className="layout">
@@ -42,7 +46,7 @@ export default function Dashboard({ user, onLogout }) {
           {user.dashboard.map((widget) => {
             const Body = WIDGETS[widget.key] ?? Placeholder
             return (
-              <article key={widget.key} className={`card ${widget.key === 'view_unit_directory' ? 'wide' : ''}`}>
+              <article key={widget.key} className={`card ${WIDE.has(widget.key) ? 'wide' : ''}`}>
                 <h2>{widget.title}</h2>
                 <p className="muted">{widget.description}</p>
                 <Body user={user} />

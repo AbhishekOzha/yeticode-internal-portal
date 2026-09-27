@@ -1,3 +1,4 @@
+from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
@@ -18,7 +19,7 @@ class SeedTests(TestCase):
         self.assertEqual(set(Unit.objects.values_list("code", flat=True)), set(UNITS))
         self.assertEqual(Role.objects.count(), len(ROLES))
         for unit_code, code, name, _, capabilities in ROLES:
-            role = Role.objects.get(unit__code=unit_code, code=code)
+            role = Role.objects.get(unit__code=unit_code, code=code) if unit_code else Role.objects.get(unit=None, code=code)
             self.assertEqual(role.name, name)
             self.assertEqual(
                 set(role.permissions.values_list("codename", flat=True)), set(capabilities)
@@ -62,6 +63,23 @@ class PermissionTests(TestCase):
         self.assertFalse(junior.has_perm("accounts.assign_tasks"))
         self.assertTrue(junior.has_perm("accounts.work_on_tasks"))
         self.assertFalse(junior.has_perm("accounts.manage_leads"))
+
+    def test_student_sees_unit_directory(self):
+        self.assertTrue(make_user("student").has_perm("accounts.view_unit_directory"))
+
+    def test_only_head_hr_has_company_wide_records(self):
+        for role in Role.objects.exclude(code="head_hr"):
+            self.assertFalse(
+                role.permissions.filter(codename="view_all_employee_records").exists(), role
+            )
+        self.assertTrue(make_user("head_hr").has_perm("accounts.view_all_employee_records"))
+
+    def test_unit_role_cannot_be_given_cross_unit_capability(self):
+        hr = Role.objects.get(code="hr")
+        perm = Permission.objects.get(codename="view_all_employee_records")
+        with transaction.atomic(), self.assertRaises(ValidationError):
+            hr.permissions.add(perm)
+        self.assertFalse(hr.permissions.filter(pk=perm.pk).exists())
 
     def test_super_admin_has_everything(self):
         admin = User.objects.create_superuser(username="boss", password="x")
@@ -114,13 +132,68 @@ class ApiTests(TestCase):
         usernames = {m["username"] for m in self.client.get(reverse("unit-members")).json()}
         self.assertEqual(usernames, {"teacher", "learner"})
 
-    def test_unit_directory_needs_capability(self):
+
+    def test_head_hr_sees_everyone_across_units(self):
+        make_user("head_hr", username="chief_hr")
+        make_user("team_lead", username="lead")
         make_user("student", username="learner")
-        self.login("learner")
+        make_user("hr", username="content_hr")
+        User.objects.create_superuser(username="boss", password="x")
+        body = self.login("chief_hr").json()
+        self.assertIsNone(body["unit"])
+        self.assertEqual(body["role"]["name"], "Head HR")
+        rows = self.client.get(reverse("company-members")).json()
+        units = {r["username"]: r["unit"] for r in rows}
+        self.assertEqual(units["lead"], "Web App Development")
+        self.assertEqual(units["learner"], "Training")
+        self.assertEqual(units["content_hr"], "Academic Content Writing")
+        self.assertNotIn("boss", units)
+
+    def test_unit_roles_cannot_see_other_units(self):
+        for role in Role.objects.exclude(unit=None):
+            make_user(role.code)
+        for role in Role.objects.exclude(unit=None):
+            self.client.logout()
+            self.login(role.code)
+            self.assertEqual(
+                self.client.get(reverse("company-members")).status_code, 403, role.code
+            )
+            response = self.client.get(reverse("unit-members"))
+            if response.status_code == 200:
+                others = {
+                    u.role.unit_id
+                    for u in User.objects.filter(username__in=[m["username"] for m in response.json()])
+                }
+                self.assertEqual(others, {role.unit_id}, role.code)
+
+    def test_head_hr_has_no_unit_directory(self):
+        make_user("head_hr", username="chief_hr")
+        self.login("chief_hr")
         self.assertEqual(self.client.get(reverse("unit-members")).status_code, 403)
 
 
 class AdminSiteTests(TestCase):
+    def test_head_hr_cannot_open_admin(self):
+        make_user("head_hr", username="chief_hr", password="pw-12345!")
+        self.client.login(username="chief_hr", password="pw-12345!")
+        self.assertEqual(self.client.get("/admin/").status_code, 302)
+        self.assertEqual(self.client.get("/admin/accounts/user/add/").status_code, 302)
+        self.assertFalse(User.objects.get(username="chief_hr").is_staff)
+
+    def test_admin_blocks_cross_unit_capability_on_unit_role(self):
+        User.objects.create_superuser(username="boss", password="pw-12345!")
+        self.client.login(username="boss", password="pw-12345!")
+        hr = Role.objects.get(code="hr")
+        perm = Permission.objects.get(codename="view_all_employee_records")
+        response = self.client.post(
+            f"/admin/accounts/role/{hr.pk}/change/",
+            {"unit": hr.unit_id, "code": hr.code, "name": hr.name, "rank": hr.rank,
+             "permissions": [perm.pk]},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Only company-wide roles")
+        self.assertFalse(hr.permissions.filter(pk=perm.pk).exists())
+
     def test_only_super_admins_can_open_admin(self):
         make_user("team_lead", username="lead", password="pw-12345!")
         self.client.login(username="lead", password="pw-12345!")

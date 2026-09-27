@@ -21,5 +21,5 @@ class Command(BaseCommand):
             if created:
                 user.set_password(password)
                 user.save()
-            self.stdout.write(f"{'created' if created else 'exists '}  {role.code:40} {role.unit.name}")
+            self.stdout.write(f"{'created' if created else 'exists '}  {role.code:40} {role.unit or 'All units'}")
         self.stdout.write(self.style.SUCCESS(f"Demo password: {password}"))
