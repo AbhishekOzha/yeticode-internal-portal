@@ -98,6 +98,7 @@ export const ChatContext = createContext({
   enabled: false,
   unread: {},
   presence: {},
+  incomingCall: null,
   totalUnread: 0,
   version: 0,
   active: null,
@@ -166,4 +167,11 @@ export function messageText(message) {
   if (message.body) return message.body
   if (message.audio) return `🎤 Voice message${message.audio_duration ? ` (${formatDuration(message.audio_duration)})` : ''}`
   return ''
+}
+
+// Audio calls: start one from anywhere with useCall().startCall(person).
+export const CallContext = createContext({ call: null, startCall: () => {} })
+
+export function useCall() {
+  return useContext(CallContext)
 }

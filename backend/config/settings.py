@@ -145,6 +145,13 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 
+# Audio calls (WebRTC). STUN is free and finds a direct route between browsers;
+# a TURN relay (e.g. coturn on your own server) is only needed for strict networks.
+CALL_STUN_URLS = env_list("CALL_STUN_URLS", "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302")
+CALL_TURN_URL = os.environ.get("CALL_TURN_URL", "")
+CALL_TURN_USERNAME = os.environ.get("CALL_TURN_USERNAME", "")
+CALL_TURN_PASSWORD = os.environ.get("CALL_TURN_PASSWORD", "")
+
 # Default accounts created by `python manage.py create_default_users`.
 # Usernames are short (admin, webdev.lead, ...); people sign in with the username,
 # username@<company domain> or their email.

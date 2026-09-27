@@ -20,6 +20,7 @@ import {
 } from '@ant-design/icons'
 import { Badge, Button, Dropdown, Flex, Layout, Menu, Spin, Tooltip, Typography, Grid } from 'antd'
 import { api } from './api'
+import { CallProvider } from './components/CallProvider'
 import { ChatProvider } from './components/ChatProvider'
 import { Logo } from './components/Logo'
 import { NotificationBell } from './components/NotificationBell'
@@ -287,7 +288,9 @@ export default function App() {
   return (
     <ChatProvider key={user.id} user={user}>
       <OfficeReminders user={user} />
-      <Shell user={user} onUserChange={setUser} onLogout={handleLogout} />
+      <CallProvider>
+        <Shell user={user} onUserChange={setUser} onLogout={handleLogout} />
+      </CallProvider>
     </ChatProvider>
   )
 }

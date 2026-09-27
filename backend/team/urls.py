@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import chat, leave, reviews, views
+from . import calls, chat, leave, reviews, views
 
 urlpatterns = [
     path("team/office-hours/", views.OfficeHoursListView.as_view(), name="office-hours"),
@@ -19,6 +19,13 @@ urlpatterns = [
     path("team/reviews/people/", reviews.ReviewPeopleView.as_view(), name="review-people"),
     path("team/reviews/summary/", reviews.ReviewSummaryView.as_view(), name="review-summary"),
     path("team/reviews/<uuid:pk>/", reviews.ReviewDeleteView.as_view(), name="review-detail"),
+    path("calls/", calls.StartCallView.as_view(), name="calls"),
+    path("calls/config/", calls.CallConfigView.as_view(), name="call-config"),
+    path("calls/<uuid:pk>/", calls.CallDetailView.as_view(), name="call"),
+    path("calls/<uuid:pk>/signal/", calls.CallSignalView.as_view(), name="call-signal"),
+    path("calls/<uuid:pk>/accept/", calls.CallActionView.as_view(action="accept"), name="call-accept"),
+    path("calls/<uuid:pk>/decline/", calls.CallActionView.as_view(action="decline"), name="call-decline"),
+    path("calls/<uuid:pk>/end/", calls.CallActionView.as_view(action="end"), name="call-end"),
     path("team/leave/", leave.MyLeaveView.as_view(), name="leave"),
     path("team/leave/requests/", leave.TeamLeaveView.as_view(), name="leave-requests"),
     path("team/leave/<uuid:pk>/cancel/", leave.CancelLeaveView.as_view(), name="leave-cancel"),

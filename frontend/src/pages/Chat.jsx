@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftOutlined, PaperClipOutlined, PlusOutlined, SearchOutlined, SendOutlined, SettingOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, PaperClipOutlined, PhoneOutlined, PlusOutlined, SearchOutlined, SendOutlined, SettingOutlined } from '@ant-design/icons'
 import { App, Badge, Button, Card, Empty, Flex, Grid, Input, Skeleton, Tooltip, Typography, Upload } from 'antd'
 import { teamApi } from '../api'
 import { NotificationSwitch } from '../components/NotificationSwitch'
@@ -8,7 +8,7 @@ import { GroupAvatar, GroupModal, OnlineAvatar, ReceiptLabel, Ticks } from '../c
 import { PersonAvatar } from '../components/People'
 import { VoiceRecorder } from '../components/VoiceRecorder'
 import { displayName } from '../people'
-import { CHAT_FILE_ACCEPT, MAX_CHAT_FILE_BYTES, messageText, presenceLabel, useChat } from '../team'
+import { CHAT_FILE_ACCEPT, MAX_CHAT_FILE_BYTES, messageText, presenceLabel, useCall, useChat } from '../team'
 
 const POLL_MS = 3000
 const GROUP_GAP_MS = 5 * 60 * 1000
@@ -55,6 +55,7 @@ function ContactRow({ selected, avatar, name, subtitle, unread, onClick }) {
 function Conversation({ me, target, people, onBack, onSent, onManageGroup }) {
   const { message: toast } = App.useApp()
   const { setUnread, presence } = useChat()
+  const { call, startCall } = useCall()
   const { peer, group } = target
   const [messages, setMessages] = useState(null)
   const [receipts, setReceipts] = useState([])
@@ -203,6 +204,16 @@ function Conversation({ me, target, people, onBack, onSent, onManageGroup }) {
             {subtitle}
           </Typography.Text>
         </div>
+        {peer && (
+          <Tooltip title={call ? 'You are already in a call' : `Audio call ${displayName(peer)}`}>
+            <Button
+              icon={<PhoneOutlined />}
+              disabled={Boolean(call)}
+              onClick={() => startCall(peer)}
+              aria-label={`Audio call ${displayName(peer)}`}
+            />
+          </Tooltip>
+        )}
         {group && (
           <Tooltip title={group.can_manage ? 'Rename, add or remove people' : 'Members and leave group'}>
             <Button icon={<SettingOutlined />} onClick={onManageGroup} aria-label="Group settings" />

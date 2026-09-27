@@ -27,6 +27,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .calls import incoming_call
 from .files import ALLOWED, IMAGES, check_attachment, extension_of
 from .models import ChatGroup, ChatMessage, ChatPresence, ChatRead
 from .views import IsTeamMember, person, team_members
@@ -546,5 +547,7 @@ class ChatUpdatesView(APIView):
             "unread": unread,
             "total_unread": sum(unread.values()),
             "presence": presence_of(list(team_members().exclude(pk=me.pk))),
+            # A call ringing for you right now, so the app can show the incoming-call screen.
+            "incoming_call": incoming_call(me),
             "new": new,
         })

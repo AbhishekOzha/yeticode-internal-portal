@@ -131,3 +131,13 @@ export const leaveApi = {
   team: (status) => request(`/team/leave/requests/?status=${status}`),
   decide: (id, decision, note) => request(`/team/leave/${id}/decide/`, { method: 'POST', body: { decision, note } }),
 }
+
+export const callsApi = {
+  config: () => request('/calls/config/'),
+  start: (to) => request('/calls/', { method: 'POST', body: { to: String(to) } }),
+  get: (id, after) => request(`/calls/${id}/?after=${after || 0}`),
+  signal: (id, kind, data) => request(`/calls/${id}/signal/`, { method: 'POST', body: { kind, data } }),
+  accept: (id) => request(`/calls/${id}/accept/`, { method: 'POST' }),
+  decline: (id) => request(`/calls/${id}/decline/`, { method: 'POST' }),
+  end: (id) => request(`/calls/${id}/end/`, { method: 'POST' }),
+}

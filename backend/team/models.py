@@ -256,3 +256,62 @@ class LeaveRequest(models.Model):
         if self.half_day:
             return 0.5
         return (self.end_date - self.start_date).days + 1
+
+
+class NextCallSignalSeq(Func):
+    """nextval() on the call signal sequence, so signals can be read in order ("after" a number)."""
+
+    template = "nextval('team_callsignal_seq')"
+    output_field = models.BigIntegerField()
+
+
+class Call(models.Model):
+    """A one-to-one audio call between two people in the team."""
+
+    class Status(models.TextChoices):
+        RINGING = "ringing", "Ringing"
+        ACTIVE = "active", "In progress"
+        ENDED = "ended", "Ended"
+        MISSED = "missed", "Missed"
+        DECLINED = "declined", "Declined"
+        CANCELLED = "cancelled", "Cancelled"
+
+    OPEN = (Status.RINGING, Status.ACTIVE)
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    caller = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="calls_made")
+    callee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="calls_received")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.RINGING, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    answered_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    # Each side's app checks in every second or two during a call; a side that goes quiet has left.
+    caller_seen_at = models.DateTimeField(null=True, blank=True)
+    callee_seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.caller} → {self.callee} ({self.status})"
+
+    @property
+    def duration_seconds(self):
+        if self.answered_at and self.ended_at:
+            return int((self.ended_at - self.answered_at).total_seconds())
+        return None
+
+
+class CallSignal(models.Model):
+    """WebRTC set-up messages (offer, answer, network candidates) passed between the two browsers."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    call = models.ForeignKey(Call, on_delete=models.CASCADE, related_name="signals")
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    seq = models.BigIntegerField(db_default=NextCallSignalSeq(), unique=True, editable=False)
+    kind = models.CharField(max_length=20)
+    data = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["seq"]

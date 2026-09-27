@@ -15,6 +15,7 @@ export function ChatProvider({ user, children }) {
   const { notification } = App.useApp()
   const [unread, setUnread] = useState({})
   const [presence, setPresence] = useState({})
+  const [incomingCall, setIncomingCall] = useState(null)
   const [version, setVersion] = useState(0)
   const [active, setActive] = useState(null)
   const latestId = useRef(null)
@@ -27,6 +28,7 @@ export function ChatProvider({ user, children }) {
     const updates = await teamApi.chatUpdates(latestId.current)
     setUnread(updates.unread)
     setPresence(updates.presence ?? {})
+    setIncomingCall(updates.incoming_call ?? null)
     const first = latestId.current === null
     latestId.current = updates.latest_seq
     if (first || !updates.new.length) return
@@ -92,6 +94,7 @@ export function ChatProvider({ user, children }) {
       enabled,
       unread,
       presence,
+      incomingCall,
       totalUnread: Object.values(unread).reduce((a, b) => a + b, 0),
       version,
       active,
@@ -99,7 +102,7 @@ export function ChatProvider({ user, children }) {
       setUnread,
       refresh: () => poll().catch(() => {}),
     }),
-    [enabled, unread, presence, version, active, poll],
+    [enabled, unread, presence, incomingCall, version, active, poll],
   )
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
 }
