@@ -138,10 +138,12 @@ function ExtraModal({ staff, month, onClose, onSaved }) {
   const { message } = App.useApp()
   const [form] = Form.useForm()
   const [busy, setBusy] = useState(false)
+  // Each type has its own fields (words_quantity, hours_quantity, performance_amount, …),
+  // so switching type never carries a number from one type into another.
   const kind = Form.useWatch('kind', form) ?? 'words'
-  const quantity = Form.useWatch('quantity', form)
-  const perQuantity = Form.useWatch('per_quantity', form)
-  const perAmount = Form.useWatch('per_amount', form)
+  const quantity = Form.useWatch(`${kind}_quantity`, form)
+  const perQuantity = Form.useWatch(`${kind}_per_quantity`, form)
+  const perAmount = Form.useWatch(`${kind}_per_amount`, form)
   const measured = kind === 'words' || kind === 'hours'
   const bounds = monthBounds(month)
 
@@ -150,14 +152,26 @@ function ExtraModal({ staff, month, onClose, onSaved }) {
     form.resetFields()
     const today = todayISO()
     const inMonth = today >= bounds.min && today <= bounds.max
-    form.setFieldsValue({ kind: 'words', date: staff.pay.daily_extra && inMonth ? today : '', ...ratesFor(staff.pay, 'words') })
+    const rates = {}
+    for (const measuredKind of ['words', 'hours']) {
+      const { per_quantity, per_amount } = ratesFor(staff.pay, measuredKind)
+      rates[`${measuredKind}_per_quantity`] = per_quantity
+      rates[`${measuredKind}_per_amount`] = per_amount
+    }
+    form.setFieldsValue({ kind: 'words', date: staff.pay.daily_extra && inMonth ? today : '', ...rates })
   }, [staff, form, bounds.min, bounds.max])
 
   async function handleFinish(values) {
     setBusy(true)
     const payload = { staff: staff.id, month, kind: values.kind, note: (values.note || '').trim(), date: values.date || null }
-    if (measured) Object.assign(payload, { quantity: values.quantity, per_quantity: values.per_quantity, per_amount: values.per_amount })
-    else payload.amount = values.amount
+    const kindValue = (field) => values[`${values.kind}_${field}`]
+    if (measured)
+      Object.assign(payload, {
+        quantity: kindValue('quantity'),
+        per_quantity: kindValue('per_quantity'),
+        per_amount: kindValue('per_amount'),
+      })
+    else payload.amount = kindValue('amount')
     try {
       const saved = await api.addPayExtra(payload)
       message.success(`${npr(saved.amount)} added for ${displayName(staff)}.`)
@@ -185,20 +199,17 @@ function ExtraModal({ staff, month, onClose, onSaved }) {
     >
       {staff && (
         <Form form={form} layout="vertical" requiredMark="optional" onFinish={handleFinish} style={{ marginTop: 16 }}>
-          <Form.Item name="kind" label="Type of extra">
-            <Segmented
-              block
-              options={Object.entries(EXTRA_KINDS).map(([value, k]) => ({ value, label: k.short }))}
-              onChange={(next) => form.setFieldsValue(next === 'words' || next === 'hours' ? ratesFor(staff.pay, next) : {})}
-            />
+          <Form.Item name="kind" label="Type of extra" rules={[{ required: true }]}>
+            <Segmented block options={Object.entries(EXTRA_KINDS).map(([value, k]) => ({ value, label: k.short }))} />
           </Form.Item>
           {measured ? (
             <>
               <Row gutter={12}>
                 <Col span={12}>
                   <Form.Item
+                    key={kind}
                     label={kind === 'words' ? 'Words written' : 'Hours worked'}
-                    name="quantity"
+                    name={`${kind}_quantity`}
                     rules={[{ required: true, message: `Enter the ${unit} done` }]}
                   >
                     <InputNumber min={0.01} style={{ width: '100%' }} suffix={unit} autoFocus />
@@ -211,7 +222,7 @@ function ExtraModal({ staff, month, onClose, onSaved }) {
                 </Col>
               </Row>
               <Form.Item label="Rate" required extra="Starts from this person's pay setup; change it for this extra only if needed.">
-                <RateInputs quantityName="per_quantity" amountName="per_amount" unit={unit} />
+                <RateInputs key={kind} quantityName={`${kind}_per_quantity`} amountName={`${kind}_per_amount`} unit={unit} />
               </Form.Item>
               <Alert
                 type={preview === null ? 'info' : 'success'}
@@ -227,7 +238,7 @@ function ExtraModal({ staff, month, onClose, onSaved }) {
           ) : (
             <Row gutter={12}>
               <Col span={12}>
-                <Form.Item label="Amount" name="amount" rules={[{ required: true, message: 'Enter the amount' }]}>
+                <Form.Item key={kind} label={`${EXTRA_KINDS[kind].label} amount`} name={`${kind}_amount`} rules={[{ required: true, message: 'Enter the amount' }]}>
                   <InputNumber min={0.01} prefix="NPR" style={{ width: '100%' }} autoFocus />
                 </Form.Item>
               </Col>
