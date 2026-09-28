@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 // In development, API, admin and uploaded media requests are proxied to Django so that the
 // session and CSRF cookies are same-origin.
-const backend = process.env.BACKEND_URL || 'http://localhost:8000'
+const backend = process.env.BACKEND_URL || 'http://localhost:9000'
 
 export default defineConfig({
   plugins: [react()],

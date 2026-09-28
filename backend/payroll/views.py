@@ -25,7 +25,7 @@ from accounts.serializers import ImageUrlField
 from accounts.models import CompanySettings
 
 from .models import MAX_HOURS_PER_DAY, PAYROLL_UNIT, PayExtra, StaffPay, extra_amount
-from .payslip import payslip
+from .payslip import payslip, unpaid_leave
 
 User = get_user_model()
 
@@ -105,9 +105,9 @@ def pay_for(user):
         return StaffPay(user=user)
 
 
-def staff_row(user, extras, month):
+def staff_row(user, extras, month, leaves=None):
     pay = pay_for(user)
-    slip = payslip(user, pay, extras, month)
+    slip = payslip(user, pay, extras, month, leaves)
     by_kind = {kind: Decimal("0") for kind in PayExtra.Kind.values}
     for extra in extras:
         by_kind[extra.kind] += extra.amount
@@ -147,9 +147,10 @@ class StaffPayListView(APIView):
         month = parse_month(request.query_params.get("month"))
         staff = list(payroll_staff())
         grouped = extras_by_staff(month, [u.pk for u in staff])
+        leave = unpaid_leave(month, staff)  # one query for everyone, not one per person
         return Response({
             "month": month.strftime("%Y-%m"),
-            "staff": [staff_row(user, grouped[user.pk], month) for user in staff],
+            "staff": [staff_row(user, grouped[user.pk], month, leave.get(user.pk, [])) for user in staff],
         })
 
 

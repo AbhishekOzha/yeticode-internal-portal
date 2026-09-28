@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { BellOutlined, CheckOutlined, CloseOutlined, InfoCircleOutlined, SendOutlined } from '@ant-design/icons'
 import {
   Alert,
@@ -306,23 +306,34 @@ function DecideModal({ decision, onClose, onDone }) {
   )
 }
 
-function TeamRequests({ onPending }) {
+// `initial`: the pending requests the page already fetched (for the tab badge), so they
+// aren't fetched a second time when the tab opens.
+function TeamRequests({ initial, onPending }) {
   const { message } = App.useApp()
   const [status, setStatus] = useState('pending')
-  const [data, setData] = useState(null)
+  const [data, setData] = useState(initial)
   const [decision, setDecision] = useState(null)
+  const fetched = useRef(false)
 
-  const load = useCallback(() => {
-    leaveApi
-      .team(status)
-      .then((d) => {
-        setData(d)
-        onPending(d.pending)
-      })
-      .catch((err) => message.error(err.message))
-  }, [status, message, onPending])
+  // Until the list fetches for itself, the page's pending requests are enough. `force` reloads
+  // after a decision. (Checking `fetched` rather than a one-shot flag keeps React's
+  // development double-run from fetching anyway.)
+  const load = useCallback(
+    (force = false) => {
+      if (!force && status === 'pending' && initial && !fetched.current) return
+      fetched.current = true
+      leaveApi
+        .team(status)
+        .then((d) => {
+          setData(d)
+          onPending(d.pending)
+        })
+        .catch((err) => message.error(err.message))
+    },
+    [status, message, onPending, initial],
+  )
 
-  useEffect(load, [load])
+  useEffect(() => load(), [load])
 
   const columns = [
     { title: 'Person', key: 'person', render: (_, l) => <PersonCell person={l.user} /> },
@@ -396,7 +407,7 @@ function TeamRequests({ onPending }) {
         onClose={() => setDecision(null)}
         onDone={() => {
           setDecision(null)
-          load()
+          load(true)
         }}
       />
     </Flex>
@@ -411,9 +422,17 @@ export default function Leave({ user }) {
   // Approvers land on the requests waiting for them; everyone else on their own leave.
   const tab = chosenTab ?? (approver && (pending > 0 || !member) ? 'requests' : 'mine')
 
-  // Load the pending count for the tab badge even before the tab is opened.
+  // Load the pending requests once: for the tab badge, and handed to the tab when it opens.
+  const [firstPending, setFirstPending] = useState(null)
   useEffect(() => {
-    if (approver) leaveApi.team('pending').then((d) => setPending(d.pending)).catch(() => {})
+    if (!approver) return
+    leaveApi
+      .team('pending')
+      .then((d) => {
+        setFirstPending(d)
+        setPending(d.pending)
+      })
+      .catch(() => setFirstPending({ pending: 0, requests: [] }))
   }, [approver])
 
   const tabs = [
@@ -426,7 +445,7 @@ export default function Leave({ user }) {
           <Badge count={pending} size="small" />
         </Flex>
       ),
-      children: <TeamRequests onPending={setPending} />,
+      children: firstPending ? <TeamRequests initial={firstPending} onPending={setPending} /> : <Skeleton active />,
     },
   ].filter(Boolean)
 

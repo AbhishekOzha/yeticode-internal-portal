@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import {
   AppstoreOutlined,
   CalendarOutlined,
@@ -18,8 +18,8 @@ import {
   UsergroupAddOutlined,
   WalletOutlined,
 } from '@ant-design/icons'
-import { Badge, Button, Dropdown, Flex, Layout, Menu, Spin, Tooltip, Typography, Grid } from 'antd'
-import { api, loadOnce } from './api'
+import { Badge, Button, Dropdown, Flex, Layout, Menu, Skeleton, Spin, Tooltip, Typography, Grid } from 'antd'
+import { api } from './api'
 import { CallProvider } from './components/CallProvider'
 import { ChatProvider } from './components/ChatProvider'
 import { Logo } from './components/Logo'
@@ -27,21 +27,23 @@ import { NotificationBell } from './components/NotificationBell'
 import { OfficeReminders } from './components/OfficeReminders'
 import { PersonAvatar } from './components/People'
 import { displayName } from './people'
-import Chat from './pages/Chat'
-import CompanySettings from './pages/CompanySettings'
 import Dashboard from './pages/Dashboard'
-import Directory from './pages/Directory'
-import Leave from './pages/Leave'
 import Login from './pages/Login'
-import OfficeHours from './pages/OfficeHours'
-import Payroll from './pages/Payroll'
 import { canManagePayroll } from './payroll'
-import Profile from './pages/Profile'
-import Reviews from './pages/Reviews'
-import Roles from './pages/Roles'
-import Users from './pages/Users'
 import { canApproveLeave, canManageOfficeHours, canReadReviews, inTeam, useChat } from './team'
 import { useThemeMode } from './themeMode'
+
+// Pages other than the dashboard and sign-in load when first opened, so start-up downloads less.
+const Chat = lazy(() => import('./pages/Chat'))
+const CompanySettings = lazy(() => import('./pages/CompanySettings'))
+const Directory = lazy(() => import('./pages/Directory'))
+const Leave = lazy(() => import('./pages/Leave'))
+const OfficeHours = lazy(() => import('./pages/OfficeHours'))
+const Payroll = lazy(() => import('./pages/Payroll'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Reviews = lazy(() => import('./pages/Reviews'))
+const Roles = lazy(() => import('./pages/Roles'))
+const Users = lazy(() => import('./pages/Users'))
 
 const { Sider, Header, Content } = Layout
 
@@ -251,7 +253,9 @@ function Shell({ user, onUserChange, onLogout }) {
           </Flex>
         </Header>
         <Content className="app-content">
-          <page.Component user={user} onUserChange={onUserChange} />
+          <Suspense fallback={<Skeleton active style={{ padding: 8 }} />}>
+            <page.Component user={user} onUserChange={onUserChange} />
+          </Suspense>
         </Content>
       </Layout>
     </Layout>
@@ -262,7 +266,8 @@ export default function App() {
   const [user, setUser] = useState(undefined) // undefined = still checking the session
 
   useEffect(() => {
-    loadOnce('session', api.session)
+    api
+      .session()
       .then((s) => setUser(s.user))
       .catch(() => setUser(null))
   }, [])

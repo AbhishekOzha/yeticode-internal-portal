@@ -5,6 +5,13 @@ import os
 import sys
 
 
+def use_port_9000_by_default():
+    """`python manage.py runserver` listens on 9000, where the Vite dev server sends /api."""
+    from django.core.management.commands import runserver
+
+    runserver.Command.default_port = os.environ.get("DJANGO_PORT", "9000")
+
+
 def main():
     """Run administrative tasks."""
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
@@ -16,6 +23,7 @@ def main():
             "available on your PYTHONPATH environment variable? Did you "
             "forget to activate a virtual environment?"
         ) from exc
+    use_port_9000_by_default()
     execute_from_command_line(sys.argv)
 
 

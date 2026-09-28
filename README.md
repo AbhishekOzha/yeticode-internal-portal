@@ -37,7 +37,7 @@ cp .env.example .env                    # then set DB_PASSWORD etc.; loaded auto
 python manage.py migrate                # also creates the units, roles and default permissions
 python manage.py create_default_users  # Super Admin + one admin per unit (safe to re-run)
 python manage.py create_demo_users      # optional, dev only: one sample person per role
-python manage.py runserver              # http://localhost:8000/admin/
+python manage.py runserver              # http://localhost:9000/admin/
 ```
 
 `create_default_users` makes these accounts if they don't exist yet. People sign in
@@ -63,7 +63,7 @@ production the command refuses to run without them.
 ```bash
 cd frontend
 yarn install                            # the project uses Yarn 1 (yarn.lock); `npm i -g yarn` if you don't have it
-yarn dev                                # http://localhost:5173 (proxies /api, /admin and /media to :8000)
+yarn dev                                # http://localhost:5173 (proxies /api, /admin and /media to :9000)
 ```
 
 ### Uploads

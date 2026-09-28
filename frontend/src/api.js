@@ -23,15 +23,18 @@ export class ApiError extends Error {
   }
 }
 
-// Start-up requests are shared, so React's development double-render doesn't send them twice.
-const once = new Map()
-export function loadOnce(key, load) {
-  if (!once.has(key)) once.set(key, load().finally(() => setTimeout(() => once.delete(key), 1000)))
-  return once.get(key)
+// Identical GETs already on their way share one response. This stops duplicate calls when
+// two parts of a page ask for the same thing at once, and React's development double-run.
+const inFlight = new Map()
+
+function request(path, options = {}) {
+  if ((options.method ?? 'GET') !== 'GET') return send(path, options)
+  if (!inFlight.has(path)) inFlight.set(path, send(path, options).finally(() => inFlight.delete(path)))
+  return inFlight.get(path)
 }
 
 // A FormData body is sent as multipart (for file uploads); anything else as JSON.
-async function request(path, { method = 'GET', body } = {}) {
+async function send(path, { method = 'GET', body } = {}) {
   const headers = { Accept: 'application/json' }
   const multipart = body instanceof FormData
   if (method !== 'GET') {

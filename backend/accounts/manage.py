@@ -8,6 +8,7 @@ can only hand out roles from that unit.
 from django.contrib.auth import password_validation
 from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import Count, Q
 from rest_framework import mixins, serializers, viewsets
 from rest_framework.permissions import BasePermission
 
@@ -213,6 +214,9 @@ class ManagedRoleSerializer(serializers.ModelSerializer):
         return unit_label(obj.unit)
 
     def get_member_count(self, obj):
+        # Counted with the list (see ManagedRoleViewSet.get_queryset); a single role saved after an edit counts itself.
+        if hasattr(obj, "active_members"):
+            return obj.active_members
         return obj.users.filter(is_active=True).count()
 
     def to_representation(self, obj):
@@ -255,7 +259,11 @@ class ManagedRoleViewSet(mixins.ListModelMixin, mixins.UpdateModelMixin, viewset
         return [IsSuperAdmin()]
 
     def get_queryset(self):
-        roles = Role.objects.select_related("unit").prefetch_related("permissions__content_type")
+        roles = (
+            Role.objects.select_related("unit")
+            .prefetch_related("permissions__content_type")
+            .annotate(active_members=Count("users", filter=Q(users__is_active=True)))
+        )
         actor = self.request.user
         if actor.is_superuser:
             return roles.order_by("unit__name", "rank", "name")

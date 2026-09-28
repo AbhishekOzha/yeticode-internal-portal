@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api, loadOnce } from '../api'
+import { api } from '../api'
 import { BrandingContext, DEFAULT_BRANDING } from '../branding'
 
 // Loads the company name and logo (public, so the sign-in page has them too)
@@ -8,7 +8,8 @@ export function BrandingProvider({ children }) {
   const [branding, setBranding] = useState(DEFAULT_BRANDING)
 
   useEffect(() => {
-    loadOnce('branding', api.branding)
+    api
+      .branding()
       .then(setBranding)
       .catch(() => {}) // The built-in mark and name are a fine fallback.
   }, [])

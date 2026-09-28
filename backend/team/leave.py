@@ -33,8 +33,19 @@ def can_approve_leave(user):
 
 
 def approvers_for(applicant):
-    """Who is notified of, and can decide, this person's leave: the unit's approvers except themselves."""
-    return [u for u in team_members() if u.pk != applicant.pk and is_leave_approver(u)]
+    """Who is notified of, and can decide, this person's leave: the unit's approvers except themselves.
+
+    One query: team members whose role grants one of the approver capabilities.
+    """
+    return list(
+        team_members()
+        .filter(
+            role__permissions__content_type__app_label="accounts",
+            role__permissions__codename__in=APPROVER_CAPABILITIES,
+        )
+        .exclude(pk=applicant.pk)
+        .distinct()
+    )
 
 
 class CanApproveLeave(BasePermission):

@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Count, F, OuterRef, Q, Subquery, Value
+from django.db.models import Case, Count, F, OuterRef, Prefetch, Q, Subquery, Value, When
 from django.db.models.functions import Coalesce
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
@@ -203,10 +203,17 @@ def receipts(conversation, me):
     """
     others = [u for u in conversation.participants(me) if u.pk != me.pk]
     delivered = dict(ChatPresence.objects.filter(user__in=others).values_list("user", "delivered_up_to"))
+    # Everyone's read marker for this conversation in one query.
+    if conversation.group:
+        markers = ChatRead.objects.filter(group=conversation.group, user__in=others)
+    elif conversation.peer:
+        markers = ChatRead.objects.filter(user=conversation.peer, peer=me)
+    else:
+        markers = ChatRead.objects.filter(peer__isnull=True, group__isnull=True, user__in=others)
+    read_by = dict(markers.values_list("user", "last_read_seq"))
     rows = []
     for user in others:
-        lookup = conversation.marker_for(user, me)
-        read = ChatRead.objects.filter(**lookup).values_list("last_read_seq", flat=True).first() or 0
+        read = read_by.get(user.pk, 0)
         rows.append({
             "id": user.pk,
             "name": user.get_full_name() or user.username,
@@ -264,8 +271,8 @@ def can_manage_group(user, group):
     return group.created_by_id == user.pk or user.has_perm("accounts.manage_unit_users")
 
 
-def group_data(group, me, unread=None, last=None):
-    members = list(group_members(group))
+def group_data(group, me, unread=None, last=None, members=None):
+    members = list(group_members(group)) if members is None else members
     return {
         "id": group.pk,
         "key": f"g{group.pk}",
@@ -358,20 +365,32 @@ class ChatContactsView(APIView):
         unread = unread_counts(me)
         members = list(team_members())
         online = presence_of(members)
+        # The last message of every one-to-one chat, in one query (DISTINCT ON the other person).
+        direct = (
+            ChatMessage.objects.filter(Q(sender=me, recipient__isnull=False) | Q(recipient=me))
+            .annotate(peer=Case(When(sender=me, then=F("recipient")), default=F("sender")))
+            .order_by("peer", "-seq")
+            .distinct("peer")
+        )
+        last_by_peer = {m.peer: m for m in direct}
         contacts = []
         for member in members:
             if member.pk == me.pk:
                 continue
-            last = Conversation(str(member.pk), peer=member).messages(me).order_by("-seq").first()
+            last = last_by_peer.get(member.pk)
             contacts.append({
                 **person(member),
                 **online[str(member.pk)],
                 "unread": unread.get(str(member.pk), 0),
                 "last_message": message_data(last) if last else None,
             })
-        groups = [
-            group_data(g, me, unread, g.messages.order_by("-seq").first()) for g in my_groups(me)
-        ]
+        # Groups with their active members and last message, in three queries whatever the count.
+        my = list(my_groups(me).prefetch_related(Prefetch("members", queryset=team_members(), to_attr="active_members")))
+        last_in_group = {
+            m.group_id: m
+            for m in ChatMessage.objects.filter(group__in=my).order_by("group_id", "-seq").distinct("group_id")
+        }
+        groups = [group_data(g, me, unread, last_in_group.get(g.pk), g.active_members) for g in my]
         last_team = ChatMessage.objects.filter(TEAM_ROOM).order_by("-seq").first()
         return Response({
             "me": person(me),
@@ -530,7 +549,7 @@ class ChatUpdatesView(APIView):
             incoming = (
                 visible.filter(seq__gt=int(after))
                 .exclude(sender=me)
-                .select_related("sender", "group")
+                .select_related("sender__role", "group")
                 .order_by("seq")[:20]
             )
             new = [

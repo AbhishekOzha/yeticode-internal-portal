@@ -31,13 +31,25 @@ def month_end(month):
     return next_month - datetime.timedelta(days=1)
 
 
-def leave_days(user, month):
-    """Approved unpaid leave inside the month; leave that runs across months only counts its days in this one."""
+def unpaid_leave(month, users):
+    """Approved unpaid leave touching the month, for many people at once: {user id: [LeaveRequest, ...]}."""
+    by_user = {}
+    approved = LeaveRequest.objects.filter(
+        user__in=users, status=LeaveRequest.Status.APPROVED, start_date__lte=month_end(month), end_date__gte=month
+    ).exclude(kind__in=PAID_LEAVE_KINDS)
+    for leave in approved:
+        by_user.setdefault(leave.user_id, []).append(leave)
+    return by_user
+
+
+def leave_days(user, month, leaves=None):
+    """Approved unpaid leave inside the month; leave that runs across months only counts its days in this one.
+
+    Pass `leaves` (from unpaid_leave) to avoid a query per person when listing many people.
+    """
     last = month_end(month)
     total = ZERO
-    approved = LeaveRequest.objects.filter(
-        user=user, status=LeaveRequest.Status.APPROVED, start_date__lte=last, end_date__gte=month
-    ).exclude(kind__in=PAID_LEAVE_KINDS)
+    approved = unpaid_leave(month, [user]).get(user.pk, []) if leaves is None else leaves
     for leave in approved:
         if leave.half_day:
             total += Decimal("0.5")
@@ -56,11 +68,11 @@ def money(value):
     return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def payslip(user, pay, extras, month):
+def payslip(user, pay, extras, month, leaves=None):
     """The payslip figures. `pay` is the StaffPay (possibly unsaved); `extras` are this month's PayExtra rows."""
     salary = pay.monthly_salary or ZERO
     per_day = (salary / DAYS_BASIS).quantize(Decimal("1"), rounding=ROUND_CEILING) if salary else ZERO
-    leave = leave_days(user, month)
+    leave = leave_days(user, month, leaves)
     working = Decimal(DAYS_BASIS) - leave
     salary_amount = min(per_day * working, salary)
 
