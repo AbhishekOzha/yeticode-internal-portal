@@ -19,7 +19,7 @@ import {
   WalletOutlined,
 } from '@ant-design/icons'
 import { Badge, Button, Dropdown, Flex, Layout, Menu, Spin, Tooltip, Typography, Grid } from 'antd'
-import { api } from './api'
+import { api, loadOnce } from './api'
 import { CallProvider } from './components/CallProvider'
 import { ChatProvider } from './components/ChatProvider'
 import { Logo } from './components/Logo'
@@ -262,10 +262,8 @@ export default function App() {
   const [user, setUser] = useState(undefined) // undefined = still checking the session
 
   useEffect(() => {
-    api
-      .ensureCsrf()
-      .then(api.me)
-      .then(setUser)
+    loadOnce('session', api.session)
+      .then((s) => setUser(s.user))
       .catch(() => setUser(null))
   }, [])
 

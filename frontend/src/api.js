@@ -23,6 +23,13 @@ export class ApiError extends Error {
   }
 }
 
+// Start-up requests are shared, so React's development double-render doesn't send them twice.
+const once = new Map()
+export function loadOnce(key, load) {
+  if (!once.has(key)) once.set(key, load().finally(() => setTimeout(() => once.delete(key), 1000)))
+  return once.get(key)
+}
+
 // A FormData body is sent as multipart (for file uploads); anything else as JSON.
 async function request(path, { method = 'GET', body } = {}) {
   const headers = { Accept: 'application/json' }
@@ -46,6 +53,8 @@ async function request(path, { method = 'GET', body } = {}) {
 export const api = {
   ensureCsrf: () => request('/auth/csrf/'),
   me: () => request('/auth/me/'),
+  // Always succeeds: { user } when signed in, { user: null } when not (and sets the CSRF cookie).
+  session: () => request('/auth/session/'),
   login: (username, password) =>
     request('/auth/login/', { method: 'POST', body: { username, password } }),
   logout: () => request('/auth/logout/', { method: 'POST' }),

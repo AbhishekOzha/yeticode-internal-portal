@@ -30,6 +30,20 @@ class CsrfView(APIView):
         return Response({"detail": "ok"})
 
 
+@method_decorator(ensure_csrf_cookie, name="dispatch")
+class SessionView(APIView):
+    """Who's signed in: {"user": {...}} or {"user": null}. Always 200, and sets the CSRF cookie.
+
+    The app calls this on start-up, so the sign-in page doesn't log a failed request.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        user = request.user if request.user.is_authenticated else None
+        return Response({"user": CurrentUserSerializer(user).data if user else None})
+
+
 class LoginView(APIView):
     permission_classes = [AllowAny]
 

@@ -116,7 +116,10 @@ function TeamStats({ user }) {
   )
 }
 
-function SectionCard({ section }) {
+const UNIT_CODES = { 'Web App Development': 'web', Training: 'training', 'Academic Content Writing': 'content' }
+
+// `showUnit`: for people who see every unit, name the unit a section belongs to.
+function SectionCard({ section, showUnit }) {
   const meta = capabilityMeta(section.key)
   const Icon = meta.icon
   const target = LIVE[section.key]
@@ -139,6 +142,11 @@ function SectionCard({ section }) {
       <Typography.Title level={5} style={{ margin: '16px 0 6px' }}>
         {section.title}
       </Typography.Title>
+      {showUnit && section.unit && (
+        <Tag color={unitColor(UNIT_CODES[section.unit]).tag} variant="filled" style={{ marginBottom: 8 }}>
+          {section.unit} only
+        </Tag>
+      )}
       <Typography.Paragraph type="secondary" style={{ marginBottom: target ? 12 : 0, minHeight: 44 }}>
         {section.description}
       </Typography.Paragraph>
@@ -173,7 +181,7 @@ export default function Dashboard({ user }) {
           <Row gutter={[16, 16]}>
             {sections.map((section) => (
               <Col key={section.key} xs={24} sm={12} xl={8} xxl={6}>
-                <SectionCard section={section} />
+                <SectionCard section={section} showUnit={!user.unit} />
               </Col>
             ))}
           </Row>

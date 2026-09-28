@@ -12,6 +12,7 @@ router.register("manage/capabilities", manage.CapabilityListView, basename="mana
 # Super Admins and Unit Admins, through /api/manage/users/ (or the Django admin).
 urlpatterns = [
     path("auth/csrf/", views.CsrfView.as_view(), name="csrf"),
+    path("auth/session/", views.SessionView.as_view(), name="session"),
     path("auth/login/", views.LoginView.as_view(), name="login"),
     path("auth/logout/", views.LogoutView.as_view(), name="logout"),
     path("auth/me/", views.MeView.as_view(), name="me"),

@@ -77,3 +77,30 @@ class UsernameTests(TestCase):
         response = APIClient().post("/api/auth/login/", {"username": "abhishek@gmail.com", "password": PASSWORD}, format="json")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["username"], "abhishekojha")
+
+
+class SessionEndpointTests(TestCase):
+    def test_signed_out_is_a_normal_answer_and_sets_csrf(self):
+        client = APIClient(enforce_csrf_checks=True)
+        response = client.get("/api/auth/session/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["user"])
+        self.assertIn("csrftoken", response.cookies)
+
+    def test_signed_in_returns_the_user(self):
+        role = Role.objects.get(unit__code="content", code="content_writer")
+        user = User.objects.create_user(username="asha", password=PASSWORD, role=role)
+        client = APIClient()
+        client.force_authenticate(user)
+        data = client.get("/api/auth/session/").json()["user"]
+        self.assertEqual(data["username"], "asha")
+        payroll = [d for d in data["dashboard"] if d["key"] == "write_content"]
+        self.assertEqual(payroll[0]["unit"], "Academic Content Writing")
+
+    def test_super_admin_payroll_card_names_the_unit(self):
+        boss = User.objects.create_superuser(username="boss", password=PASSWORD)
+        client = APIClient()
+        client.force_authenticate(boss)
+        cards = {d["key"]: d for d in client.get("/api/auth/session/").json()["user"]["dashboard"]}
+        self.assertEqual(cards["manage_payroll"]["unit"], "Academic Content Writing")
+        self.assertIsNone(cards["manage_users"]["unit"])
