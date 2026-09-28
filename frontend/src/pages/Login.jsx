@@ -4,14 +4,7 @@ import { Alert, Button, Card, Flex, Form, Input, Typography } from 'antd'
 import { api } from '../api'
 import { LogoMark } from '../components/Logo'
 import { useBranding } from '../branding'
-import { UNIT_COLORS } from '../colors'
-
-const UNITS = [
-  { code: 'web', name: 'Web App Development', blurb: 'Client projects, code and delivery' },
-  { code: 'training', name: 'Training', blurb: 'Courses, batches and students' },
-  { code: 'content', name: 'Academic Content Writing', blurb: 'Research, writing and production' },
-]
-
+// The sign-in page is public, so it stays neutral: no internal team names.
 function BrandPanel() {
   const { branding } = useBranding()
   return (
@@ -32,21 +25,10 @@ function BrandPanel() {
         </div>
       </Flex>
       <div style={{ marginTop: 'auto', position: 'relative' }}>
-        <h1 className="login-headline">One workspace for every team at {branding.name.split(/\s+/)[0]}.</h1>
-        <p style={{ opacity: 0.8, fontSize: 16, maxWidth: 440 }}>
-          Sign in to see the tools and people for your role, in your unit.
+        <h1 className="login-headline">Welcome to your staff portal.</h1>
+        <p style={{ opacity: 0.8, fontSize: 16, maxWidth: 440, marginBottom: 0 }}>
+          Sign in to reach your team, your work and your requests, all in one place.
         </p>
-        <Flex vertical gap={12} style={{ marginTop: 28 }}>
-          {UNITS.map((u) => (
-            <Flex key={u.code} align="center" gap={12} className="login-unit">
-              <span className="login-unit-dot" style={{ background: UNIT_COLORS[u.code].color }} />
-              <div>
-                <div style={{ fontWeight: 600 }}>{u.name}</div>
-                <div style={{ opacity: 0.7, fontSize: 13 }}>{u.blurb}</div>
-              </div>
-            </Flex>
-          ))}
-        </Flex>
       </div>
     </div>
   )
@@ -104,7 +86,7 @@ export default function Login({ onLogin }) {
           <Typography.Paragraph type="secondary" style={{ marginTop: 24, fontSize: 13, textAlign: 'center' }}>
             Accounts are created by administrators. There is no self sign-up.
             <br />
-            Forgot your password? Ask your unit admin to reset it.
+            Forgot your password? Ask your administrator to reset it.
           </Typography.Paragraph>
         </Card>
       </Flex>

@@ -106,15 +106,6 @@ html[data-theme='dark'] .app-header { border-bottom-color: rgba(255, 255, 255, 0
 }
 .login-peaks { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 45%; }
 .login-headline { font-size: 40px; line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 14px; max-width: 520px; }
-.login-unit {
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  max-width: 420px;
-  backdrop-filter: blur(4px);
-}
-.login-unit-dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.15); flex-shrink: 0; }
 .login-form-side { padding: 32px 20px; }
 .login-card { width: 100%; max-width: 420px; box-shadow: none !important; background: transparent !important; }
 .login-mobile-logo { display: none !important; margin-bottom: 28px; }
