@@ -27,7 +27,8 @@ from .views import IsTeamMember, person, team_members
 
 RING_SECONDS = 35
 GONE_SECONDS = 20
-SIGNAL_KINDS = {"offer", "answer", "candidate"}
+# offer/answer/candidate set up the connection; "screen" says whether the sender is sharing their screen.
+SIGNAL_KINDS = {"offer", "answer", "candidate", "screen"}
 MAX_SIGNAL_BYTES = 20_000
 
 
@@ -188,7 +189,7 @@ class CallSignalView(APIView):
         kind = request.data.get("kind")
         data = request.data.get("data")
         if kind not in SIGNAL_KINDS or not isinstance(data, dict):
-            raise ValidationError({"kind": "Send an offer, answer or candidate."})
+            raise ValidationError({"kind": "Send an offer, answer, candidate or screen signal."})
         if len(str(data)) > MAX_SIGNAL_BYTES:
             raise ValidationError({"data": "That signal is too large."})
         CallSignal.objects.create(call=call, sender=me, kind=kind, data=data)

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AudioMutedOutlined, AudioOutlined, PhoneFilled } from '@ant-design/icons'
+import { AudioMutedOutlined, AudioOutlined, DesktopOutlined, FullscreenOutlined, PhoneFilled } from '@ant-design/icons'
 import { App, Button, Flex, Modal, Tooltip, Typography } from 'antd'
 import { callsApi } from '../api'
 import { desktopNotify } from '../notify'
@@ -8,6 +8,8 @@ import { CallContext, formatDuration, useChat } from '../team'
 import { PersonAvatar } from './People'
 
 const POLL_MS = 1000
+// Screen sharing needs getDisplayMedia, which computer browsers have and phones don't.
+const CAN_SHARE_SCREEN = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getDisplayMedia)
 const FINISHED = ['ended', 'missed', 'declined', 'cancelled']
 const END_TEXT = {
   ended: 'Call ended',
@@ -49,6 +51,10 @@ export function CallProvider({ children }) {
   const [call, setCall] = useState(null) // { id, peer, incoming, status, phase }
   const [muted, setMuted] = useState(false)
   const [elapsed, setElapsed] = useState(0)
+  const [sharing, setSharing] = useState(false) // I'm sharing my screen
+  const [peerSharing, setPeerSharing] = useState(false) // they're sharing theirs
+  const screen = useRef(null)
+  const remoteVideo = useRef(null)
   const pc = useRef(null)
   const stream = useRef(null)
   const audio = useRef(null)
@@ -70,6 +76,11 @@ export function CallProvider({ children }) {
     stream.current?.getTracks().forEach((t) => t.stop())
     stream.current = null
     if (audio.current) audio.current.srcObject = null
+    screen.current?.getTracks().forEach((t) => t.stop())
+    screen.current = null
+    if (remoteVideo.current) remoteVideo.current.srcObject = null
+    setSharing(false)
+    setPeerSharing(false)
     pendingCandidates.current = []
     offered.current = false
     afterSeq.current = 0
@@ -95,17 +106,22 @@ export function CallProvider({ children }) {
   }
 
   // Microphone + peer connection. Signals go to the other side through the server.
-  const connect = useCallback(async (callId) => {
+  // The caller also reserves a video channel for screen sharing, so sharing later
+  // only swaps a track in, with no need to renegotiate the connection.
+  const connect = useCallback(async (callId, { offerer = false } = {}) => {
     stream.current = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
     const peer = new RTCPeerConnection({ iceServers: await servers() })
     pc.current = peer
     stream.current.getTracks().forEach((track) => peer.addTrack(track, stream.current))
+    if (offerer) peer.addTransceiver('video', { direction: 'sendrecv' })
     peer.onicecandidate = (e) => {
       if (e.candidate) callsApi.signal(callId, 'candidate', e.candidate.toJSON()).catch(() => {})
     }
     peer.ontrack = (e) => {
-      if (audio.current) {
-        audio.current.srcObject = e.streams[0]
+      if (e.track.kind === 'video') {
+        if (remoteVideo.current) remoteVideo.current.srcObject = new MediaStream([e.track])
+      } else if (audio.current) {
+        audio.current.srcObject = e.streams[0] ?? new MediaStream([e.track])
         audio.current.play().catch(() => {})
       }
     }
@@ -124,8 +140,16 @@ export function CallProvider({ children }) {
   const applySignal = useCallback(async (callId, signal) => {
     const peer = pc.current
     if (!peer) return
+    if (signal.kind === 'screen') {
+      setPeerSharing(Boolean(signal.data?.sharing))
+      return
+    }
     if (signal.kind === 'offer') {
       await peer.setRemoteDescription(signal.data)
+      // Let our side send on the reserved video channel too, so either person can share.
+      peer.getTransceivers().forEach((t) => {
+        if (t.receiver.track?.kind === 'video') t.direction = 'sendrecv'
+      })
       const answer = await peer.createAnswer()
       await peer.setLocalDescription(answer)
       await callsApi.signal(callId, 'answer', { type: answer.type, sdp: answer.sdp })
@@ -158,7 +182,7 @@ export function CallProvider({ children }) {
           // They picked up: set up the connection and send the offer.
           offered.current = true
           setCall((c) => (c ? { ...c, status: 'active', phase: 'connecting' } : c))
-          const peer = await connect(callId)
+          const peer = await connect(callId, { offerer: true })
           const offer = await peer.createOffer()
           await peer.setLocalDescription(offer)
           await callsApi.signal(callId, 'offer', { type: offer.type, sdp: offer.sdp })
@@ -258,6 +282,41 @@ export function CallProvider({ children }) {
     finish(current.status === 'ringing' ? 'cancelled' : 'ended')
   }
 
+  function videoSender() {
+    return pc.current?.getTransceivers().find((t) => t.receiver.track?.kind === 'video')?.sender
+  }
+
+  const stopSharing = useCallback(async () => {
+    const current = callRef.current
+    screen.current?.getTracks().forEach((t) => t.stop())
+    screen.current = null
+    setSharing(false)
+    await videoSender()?.replaceTrack(null).catch(() => {})
+    if (current) callsApi.signal(current.id, 'screen', { sharing: false }).catch(() => {})
+  }, [])
+
+  async function startSharing() {
+    const current = callRef.current
+    const sender = videoSender()
+    if (!current || !sender) {
+      message.warning('Screen sharing needs both people on the latest version of the app. Refresh and call again.')
+      return
+    }
+    let display
+    try {
+      display = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 15 }, audio: false })
+    } catch {
+      return // They closed the picker; nothing to do.
+    }
+    const track = display.getVideoTracks()[0]
+    track.contentHint = 'detail' // keep text sharp rather than smooth
+    track.onended = () => stopSharing() // the browser's own "Stop sharing" button
+    screen.current = display
+    await sender.replaceTrack(track)
+    setSharing(true)
+    callsApi.signal(current.id, 'screen', { sharing: true }).catch(() => {})
+  }
+
   function toggleMute() {
     const next = !muted
     stream.current?.getAudioTracks().forEach((t) => (t.enabled = !next))
@@ -296,6 +355,24 @@ export function CallProvider({ children }) {
     <CallContext.Provider value={value}>
       {children}
       <audio ref={audio} autoPlay aria-hidden="true" />
+      {/* Always mounted so the incoming screen track has somewhere to go; shown while they share. */}
+      <div className={`screen-view ${call && peerSharing ? 'open' : ''}`} aria-hidden={!(call && peerSharing)}>
+        <Flex justify="space-between" align="center" className="screen-view-head">
+          <Typography.Text strong style={{ color: '#fff' }}>
+            {call ? `${displayName(call.peer)} is sharing their screen` : ''}
+          </Typography.Text>
+          <Tooltip title="Full screen">
+            <Button
+              size="small"
+              type="text"
+              icon={<FullscreenOutlined style={{ color: '#fff' }} />}
+              onClick={() => remoteVideo.current?.requestFullscreen?.()}
+              aria-label="Full screen"
+            />
+          </Tooltip>
+        </Flex>
+        <video ref={remoteVideo} autoPlay playsInline muted className="screen-video" aria-label="Shared screen" />
+      </div>
       <Modal
         open={Boolean(call?.incoming && call.status === 'ringing')}
         closable={false}
@@ -356,8 +433,20 @@ export function CallProvider({ children }) {
             <Typography.Text strong ellipsis style={{ display: 'block', color: '#fff' }}>
               {displayName(call.peer)}
             </Typography.Text>
-            <span className="call-status">{statusText}</span>
+            <span className="call-status">{sharing ? `${statusText} · sharing your screen` : statusText}</span>
           </div>
+          {CAN_SHARE_SCREEN && call.phase === 'connected' && (
+            <Tooltip title={sharing ? 'Stop sharing your screen' : peerSharing ? `${displayName(call.peer)} is sharing` : 'Share your screen'}>
+              <Button
+                shape="circle"
+                icon={<DesktopOutlined />}
+                onClick={sharing ? stopSharing : startSharing}
+                disabled={peerSharing && !sharing}
+                aria-label={sharing ? 'Stop sharing' : 'Share screen'}
+                className={sharing ? 'call-sharing' : ''}
+              />
+            </Tooltip>
+          )}
           <Tooltip title={muted ? 'Unmute' : 'Mute'}>
             <Button
               shape="circle"

@@ -234,3 +234,15 @@ html[data-theme='dark'] .payslip td, html[data-theme='dark'] .payslip th { borde
 .call-btn.accept { background: #2b8a3e !important; }
 .call-pulse { border-radius: 50%; animation: call-pulse 1.4s ease-out infinite; }
 @keyframes call-pulse { 0% { box-shadow: 0 0 0 0 rgba(43, 138, 62, 0.45); } 100% { box-shadow: 0 0 0 22px rgba(43, 138, 62, 0); } }
+
+/* Screen sharing */
+.call-sharing { background: #2b8a3e !important; color: #fff !important; border-color: #2b8a3e !important; }
+.screen-view {
+  position: fixed; z-index: 999; right: 20px; bottom: 96px; display: none; flex-direction: column;
+  width: min(900px, calc(100vw - 40px)); max-height: calc(100vh - 140px);
+  background: #0b1020; border-radius: 14px; overflow: hidden; box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
+}
+.screen-view.open { display: flex; }
+.screen-view-head { padding: 8px 12px; background: rgba(255, 255, 255, 0.06); }
+.screen-video { width: 100%; min-height: 200px; max-height: calc(100vh - 190px); object-fit: contain; background: #000; }
+@media (max-width: 640px) { .screen-view { right: 8px; left: 8px; width: auto; bottom: 88px; } }

@@ -109,3 +109,17 @@ class CallTests(TestCase):
     def test_config_has_stun(self):
         config = self.client_for(self.a).get("/api/calls/config/").json()
         self.assertTrue(config["ice_servers"][0]["urls"][0].startswith("stun:"))
+
+
+    def test_screen_share_signal_reaches_the_other_side(self):
+        call = self.start(self.a, self.b).json()
+        self.client_for(self.b).post(f"/api/calls/{call['id']}/accept/")
+        a, b = self.client_for(self.a), self.client_for(self.b)
+        self.assertEqual(
+            a.post(f"/api/calls/{call['id']}/signal/", {"kind": "screen", "data": {"sharing": True}}, format="json").status_code, 201
+        )
+        signals = b.get(f"/api/calls/{call['id']}/?after=0").json()["signals"]
+        self.assertEqual([(s["kind"], s["data"]) for s in signals], [("screen", {"sharing": True})])
+        self.assertEqual(
+            a.post(f"/api/calls/{call['id']}/signal/", {"kind": "video", "data": {}}, format="json").status_code, 400
+        )
