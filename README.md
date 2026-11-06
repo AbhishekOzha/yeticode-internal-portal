@@ -96,6 +96,26 @@ work while the app is open; ringing in the background needs push notifications, 
 For a real release the backend must be online with HTTPS, and you'd build with `yarn build && npx cap sync`
 (no `CAP_DEV_URL`).
 
+### 5. Flutter mobile app (`mobile/`)
+
+A native Flutter app (iOS and Android) that talks to the same Django API with the same session cookie
+and CSRF token as the website. It has sign-in, the **team feed** (posts with photos, likes, comments),
+24-hour **stories**, team chat (team room, one-to-one, groups, voice messages, files and photos, ticks and
+online dots), **audio calls** (WebRTC, ringing, mute, speaker; phones can watch a shared screen but not share
+their own), notifications and leave. The Capacitor app in `frontend/` still works too.
+
+```bash
+brew install --cask flutter            # once
+cd mobile
+flutter pub get
+flutter run                            # picks a connected phone / emulator / simulator
+```
+
+The server address defaults to `http://localhost:9000` (iOS simulator) or `http://10.0.2.2:9000` (Android
+emulator); on a real phone use **Change server** on the sign-in page and enter your computer's address or the
+HTTPS address of the deployed backend. Ringing in the background and push notifications aren't set up yet
+(the app polls while it is open, like the website).
+
 ## How access works
 
 | Concept | Where it lives |
@@ -175,6 +195,10 @@ cards are placeholders for the features each unit will need.
 | `GET /api/team/leave/requests/?status=pending\|all`, `POST /api/team/leave/<id>/decide/` | The team's requests (Production Manager, HR, Super Admin); `{"decision": "approve"\|"reject", "note"}` |
 | `GET /api/notifications/`, `POST /api/notifications/read/` | Your latest notifications and unread count; mark some (`ids`) or all read |
 | `POST /api/calls/`, `GET /api/calls/<id>/?after=<seq>`, `POST /api/calls/<id>/signal/\|accept/\|decline/\|end/`, `GET /api/calls/config/` | Start a call (`to`), poll its status and the other side's WebRTC signals, pass signals, answer or end it; ICE servers. Incoming calls also arrive in `GET /api/chat/updates/` as `incoming_call`. |
+| `GET/POST /api/feed/posts/`, `DELETE /api/feed/posts/<id>/`, `GET /api/feed/posts/<id>/image/` | Team feed (Academic Content Writing only): newest first (`?before=<post id>` for the next page); post `body` and/or a photo `image` (multipart); delete your own; photos are served only to the team |
+| `POST/DELETE /api/feed/posts/<id>/like/`, `GET/POST /api/feed/posts/<id>/comments/` | Like or unlike a post; read and add comments |
+| `GET/POST /api/feed/stories/`, `DELETE /api/feed/stories/<id>/`, `GET /api/feed/stories/<id>/image/` | Live stories (last 24 hours) grouped by person, yours first; add one (`image`, optional `caption`); delete your own |
+| `POST/GET /api/feed/stories/<id>/viewed/` | Mark a story seen; its author lists who has seen it |
 | `GET /api/branding/` | Company name, tagline and logo. Public, for the sign-in page. |
 | `GET/PATCH /api/manage/company/` | Company details and `logo` (Super Admins only) |
 | `GET /api/unit/members/` | People in your unit (needs `view_unit_directory`) |

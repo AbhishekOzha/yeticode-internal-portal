@@ -315,3 +315,48 @@ class CallSignal(models.Model):
 
     class Meta:
         ordering = ["seq"]
+
+
+def feed_upload_to(instance, filename):
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else "jpg"
+    return f"feed/{uuid.uuid4().hex}.{extension}"
+
+
+class Post(models.Model):
+    """A feed post by someone in the team: text, an optional photo, likes and comments."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="feed_posts")
+    body = models.TextField(max_length=4000, blank=True)
+    image = models.FileField(upload_to=feed_upload_to, storage=private_storage, blank=True, max_length=200)
+    likes = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="liked_posts", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class PostComment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="comments")
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    body = models.TextField(max_length=1000)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+
+class Story(models.Model):
+    """A photo (with an optional caption) that the team can see for 24 hours."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="stories")
+    image = models.FileField(upload_to=feed_upload_to, storage=private_storage, max_length=200)
+    caption = models.CharField(max_length=200, blank=True)
+    viewers = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="stories_seen", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        verbose_name_plural = "stories"

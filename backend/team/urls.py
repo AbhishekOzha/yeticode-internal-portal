@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import calls, chat, leave, reviews, views
+from . import calls, chat, feed, leave, reviews, views
 
 urlpatterns = [
     path("team/office-hours/", views.OfficeHoursListView.as_view(), name="office-hours"),
@@ -26,6 +26,15 @@ urlpatterns = [
     path("calls/<uuid:pk>/accept/", calls.CallActionView.as_view(action="accept"), name="call-accept"),
     path("calls/<uuid:pk>/decline/", calls.CallActionView.as_view(action="decline"), name="call-decline"),
     path("calls/<uuid:pk>/end/", calls.CallActionView.as_view(action="end"), name="call-end"),
+    path("feed/posts/", feed.FeedPostsView.as_view(), name="feed-posts"),
+    path("feed/posts/<uuid:pk>/", feed.FeedPostView.as_view(), name="feed-post"),
+    path("feed/posts/<uuid:pk>/image/", feed.FeedPostImageView.as_view(), name="feed-post-image"),
+    path("feed/posts/<uuid:pk>/like/", feed.FeedLikeView.as_view(), name="feed-like"),
+    path("feed/posts/<uuid:pk>/comments/", feed.FeedCommentsView.as_view(), name="feed-comments"),
+    path("feed/stories/", feed.StoriesView.as_view(), name="feed-stories"),
+    path("feed/stories/<uuid:pk>/", feed.StoryView.as_view(), name="feed-story"),
+    path("feed/stories/<uuid:pk>/image/", feed.StoryImageView.as_view(), name="feed-story-image"),
+    path("feed/stories/<uuid:pk>/viewed/", feed.StoryViewedView.as_view(), name="feed-story-viewed"),
     path("team/leave/", leave.MyLeaveView.as_view(), name="leave"),
     path("team/leave/requests/", leave.TeamLeaveView.as_view(), name="leave-requests"),
     path("team/leave/<uuid:pk>/cancel/", leave.CancelLeaveView.as_view(), name="leave-cancel"),
