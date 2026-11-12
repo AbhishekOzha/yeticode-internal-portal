@@ -152,6 +152,9 @@ CALL_TURN_URL = os.environ.get("CALL_TURN_URL", "")
 CALL_TURN_USERNAME = os.environ.get("CALL_TURN_USERNAME", "")
 CALL_TURN_PASSWORD = os.environ.get("CALL_TURN_PASSWORD", "")
 
+# GIFs and stickers in chat come from Giphy (free key from developers.giphy.com). Empty = the picker says GIFs aren't set up.
+GIPHY_API_KEY = os.environ.get("GIPHY_API_KEY", "")
+
 # Default accounts created by `python manage.py create_default_users`.
 # Usernames are short (admin, webdev.lead, ...); people sign in with the username,
 # username@<company domain> or their email.

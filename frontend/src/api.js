@@ -131,6 +131,31 @@ export const teamApi = {
   chatUpdates: (after) => request(`/chat/updates/${after ? `?after=${after}` : ''}`),
 }
 
+export const feedApi = {
+  posts: (before) => request(`/feed/posts/${before ? `?before=${before}` : ''}`),
+  post: (body, image) => {
+    const data = new FormData()
+    data.append('body', body)
+    if (image) data.append('image', image, image.name)
+    return request('/feed/posts/', { method: 'POST', body: data })
+  },
+  deletePost: (id) => request(`/feed/posts/${id}/`, { method: 'DELETE' }),
+  like: (id) => request(`/feed/posts/${id}/like/`, { method: 'POST' }),
+  unlike: (id) => request(`/feed/posts/${id}/like/`, { method: 'DELETE' }),
+  comments: (id) => request(`/feed/posts/${id}/comments/`),
+  comment: (id, body) => request(`/feed/posts/${id}/comments/`, { method: 'POST', body: { body } }),
+  stories: () => request('/feed/stories/'),
+  addStory: (image, caption) => {
+    const data = new FormData()
+    data.append('image', image, image.name)
+    if (caption) data.append('caption', caption)
+    return request('/feed/stories/', { method: 'POST', body: data })
+  },
+  deleteStory: (id) => request(`/feed/stories/${id}/`, { method: 'DELETE' }),
+  viewStory: (id) => request(`/feed/stories/${id}/viewed/`, { method: 'POST' }),
+  storyViewers: (id) => request(`/feed/stories/${id}/viewed/`),
+}
+
 export const notificationsApi = {
   list: () => request('/notifications/'),
   markRead: (ids) => request('/notifications/read/', { method: 'POST', body: ids ? { ids } : {} }),

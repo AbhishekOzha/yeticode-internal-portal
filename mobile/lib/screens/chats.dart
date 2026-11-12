@@ -7,13 +7,15 @@ import '../api.dart';
 import '../state.dart';
 import '../util.dart';
 import '../widgets/api_image.dart';
+import '../widgets/gif_picker.dart';
 import 'chat_screen.dart';
 
 String lastText(Json? m) {
   if (m == null) return 'No messages yet';
   if (m['audio'] != null) return '🎤 Voice message';
   if (m['file'] != null) return '📎 ${m['file']['name']}';
-  return (m['body'] ?? '').toString();
+  final body = (m['body'] ?? '').toString();
+  return isGif(body) ? 'GIF' : body;
 }
 
 class ChatsScreen extends StatefulWidget {
@@ -112,7 +114,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       floatingActionButton: FloatingActionButton(onPressed: _newGroup, tooltip: 'New group', child: const Icon(Icons.group_add)),
       body: RefreshIndicator(
         onRefresh: _load,
-        child: ListView(children: [
+        child: ListView(physics: const AlwaysScrollableScrollPhysics(), children: [
           ListTile(
             leading: const CircleAvatar(child: Icon(Icons.groups)),
             title: const Text('Team room', style: TextStyle(fontWeight: FontWeight.w600)),

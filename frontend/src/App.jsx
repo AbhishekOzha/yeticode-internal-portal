@@ -4,6 +4,7 @@ import {
   CalendarOutlined,
   ClockCircleOutlined,
   FileTextOutlined,
+  PictureOutlined,
   LogoutOutlined,
   MessageOutlined,
   MenuFoldOutlined,
@@ -36,6 +37,7 @@ import { useThemeMode } from './themeMode'
 // Pages other than the dashboard and sign-in load when first opened, so start-up downloads less.
 const Chat = lazy(() => import('./pages/Chat'))
 const CompanySettings = lazy(() => import('./pages/CompanySettings'))
+const Feed = lazy(() => import('./pages/Feed'))
 const Directory = lazy(() => import('./pages/Directory'))
 const Leave = lazy(() => import('./pages/Leave'))
 const OfficeHours = lazy(() => import('./pages/OfficeHours'))
@@ -65,6 +67,7 @@ function pagesFor(user) {
   if (user.is_super_admin)
     pages.push({ key: 'company', label: 'Company settings', icon: <SettingOutlined />, Component: CompanySettings })
   const content = CONTENT_SECTION
+  if (inTeam(user)) pages.push({ key: 'feed', label: 'Team feed', icon: <PictureOutlined />, Component: Feed, section: content })
   if (inTeam(user)) pages.push({ key: 'chat', label: 'Team chat', icon: <MessageOutlined />, Component: Chat, section: content })
   if (inTeam(user) || canApproveLeave(user))
     pages.push({ key: 'leave', label: 'Leave', icon: <CalendarOutlined />, Component: Leave, section: content })

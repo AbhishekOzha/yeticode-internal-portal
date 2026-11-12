@@ -17,6 +17,8 @@ import '../call.dart';
 import '../state.dart';
 import '../util.dart';
 import '../widgets/api_image.dart';
+import '../widgets/gif_picker.dart';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key, required this.convKey, required this.title, this.peer, this.group});
@@ -33,7 +35,7 @@ class _ChatScreenState extends State<ChatScreen> {
   List<Json> _messages = [];
   List<Json> _receipts = [];
   Timer? _timer, _recTimer;
-  bool _loading = true, _recording = false, _fetching = false;
+  bool _loading = true, _recording = false, _fetching = false, _emoji = false;
   int _recSeconds = 0;
   int _lastSeq = 0;
 
@@ -113,6 +115,12 @@ class _ChatScreenState extends State<ChatScreen> {
     if (body.isEmpty) return;
     _text.clear();
     _send(body: body);
+  }
+
+  Future<void> _gif() async {
+    FocusScope.of(context).unfocus();
+    final url = await showModalBottomSheet<String>(context: context, isScrollControlled: true, builder: (_) => const GifPicker());
+    if (url != null) _send(body: url);
   }
 
   Future<void> _attach() async {
@@ -230,6 +238,15 @@ class _ChatScreenState extends State<ChatScreen> {
                     IconButton.filled(onPressed: _toggleRecord, icon: const Icon(Icons.send)),
                   ])
                 : Row(children: [
+                    IconButton(
+                      onPressed: () {
+                        FocusScope.of(context).unfocus();
+                        setState(() => _emoji = !_emoji);
+                      },
+                      icon: Icon(_emoji ? Icons.keyboard : Icons.emoji_emotions_outlined),
+                      tooltip: 'Emoji',
+                    ),
+                    IconButton(onPressed: _gif, icon: const Icon(Icons.gif_box_outlined), tooltip: 'GIFs and stickers'),
                     IconButton(onPressed: _attach, icon: const Icon(Icons.attach_file)),
                     Expanded(
                       child: TextField(
@@ -237,6 +254,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         minLines: 1,
                         maxLines: 4,
                         onChanged: (_) => setState(() {}),
+                        onTap: () => setState(() => _emoji = false),
                         textCapitalization: TextCapitalization.sentences,
                         decoration: InputDecoration(hintText: 'Message', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)), isDense: true),
                       ),
@@ -248,6 +266,16 @@ class _ChatScreenState extends State<ChatScreen> {
                   ]),
           ),
         ),
+        if (_emoji)
+          SizedBox(
+            height: 260,
+            child: EmojiPicker(
+              textEditingController: _text,
+              onEmojiSelected: (_, __) => setState(() {}),
+              onBackspacePressed: () => setState(() {}),
+              config: const Config(height: 260, emojiViewConfig: EmojiViewConfig(columns: 8, emojiSizeMax: 28)),
+            ),
+          ),
       ]),
     );
   }
@@ -297,7 +325,10 @@ class _Bubble extends StatelessWidget {
                 Flexible(child: Text(file['name'], style: TextStyle(color: fg, decoration: TextDecoration.underline))),
               ]),
             ),
-          if ((message['body'] as String).isNotEmpty) Text(message['body'], style: TextStyle(color: fg, fontSize: 15)),
+          if (isGif(message['body']))
+            ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(message['body'], height: 180, fit: BoxFit.contain))
+          else if ((message['body'] as String).isNotEmpty)
+            Text(message['body'], style: TextStyle(color: fg, fontSize: 15)),
           const SizedBox(height: 2),
           Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.end, children: [
             Text(clock(message['created_at']), style: TextStyle(fontSize: 10, color: fg.withValues(alpha: 0.7))),

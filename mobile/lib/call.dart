@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,7 @@ import 'state.dart';
 import 'util.dart';
 import 'widgets/api_image.dart';
 
+const _screenChannel = MethodChannel('yeticode/screenshare');
 const _finished = ['ended', 'missed', 'declined', 'cancelled'];
 const _endText = {'ended': 'Call ended', 'missed': 'No answer', 'declined': 'Call declined', 'cancelled': 'Call cancelled'};
 
@@ -29,6 +31,8 @@ class CallController extends ChangeNotifier {
   bool muted = false;
   bool speaker = false;
   bool peerSharing = false;
+  bool sharing = false;
+  MediaStream? _screen;
   int elapsed = 0;
   String? notice;
 
@@ -206,6 +210,10 @@ class CallController extends ChangeNotifier {
     }
     if (kind == 'offer') {
       await pc.setRemoteDescription(RTCSessionDescription(data['sdp'], data['type']));
+      // Let our side send on the reserved video channel too, so either person can share.
+      for (final t in await pc.getTransceivers()) {
+        if (t.receiver.track?.kind == 'video') await t.setDirection(TransceiverDirection.SendRecv);
+      }
       final answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       await api.post('/calls/$id/signal/', {'kind': 'answer', 'data': {'type': answer.type, 'sdp': answer.sdp}});
@@ -256,6 +264,57 @@ class CallController extends ChangeNotifier {
     _finish(ringingOut ? 'cancelled' : 'ended', false);
   }
 
+  Future<RTCRtpSender?> _videoSender() async {
+    for (final t in await _pc?.getTransceivers() ?? <RTCRtpTransceiver>[]) {
+      if (t.receiver.track?.kind == 'video') return t.sender;
+    }
+    return null;
+  }
+
+  Future<void> startSharing() async {
+    final current = call;
+    final sender = await _videoSender();
+    if (current == null || sender == null || sharing) {
+      _notice('Screen sharing needs both people on the latest version of the app. End the call and call again.');
+      return;
+    }
+    try {
+      if (Platform.isAndroid) {
+        if (!await Helper.requestCapturePermission()) return; // they said no
+        await _screenChannel.invokeMethod('start');
+      }
+      final display = await navigator.mediaDevices.getDisplayMedia({
+        'video': {'frameRate': 15},
+        'audio': false,
+      });
+      final track = display.getVideoTracks().first;
+      track.onEnded = stopSharing;
+      _screen = display;
+      await sender.replaceTrack(track);
+      sharing = true;
+      notifyListeners();
+      api.post('/calls/${current['id']}/signal/', {'kind': 'screen', 'data': {'sharing': true}}).catchError((_) => null);
+    } catch (e) {
+      if (Platform.isAndroid) _screenChannel.invokeMethod('stop').catchError((_) => null);
+      _notice("Couldn't start screen sharing.");
+    }
+  }
+
+  Future<void> stopSharing() async {
+    final current = call;
+    _screen?.getTracks().forEach((t) => t.stop());
+    _screen = null;
+    if (Platform.isAndroid) _screenChannel.invokeMethod('stop').catchError((_) => null);
+    if (sharing) {
+      sharing = false;
+      notifyListeners();
+      (await _videoSender())?.replaceTrack(null).catchError((_) => null);
+      if (current != null) {
+        api.post('/calls/${current['id']}/signal/', {'kind': 'screen', 'data': {'sharing': false}}).catchError((_) => null);
+      }
+    }
+  }
+
   void toggleMute() {
     muted = !muted;
     for (final t in _local?.getAudioTracks() ?? <MediaStreamTrack>[]) {
@@ -276,6 +335,10 @@ class CallController extends ChangeNotifier {
     _timer?.cancel();
     _ring?.cancel();
     _poll = _timer = _ring = null;
+    _screen?.getTracks().forEach((t) => t.stop());
+    _screen = null;
+    if (sharing && Platform.isAndroid) _screenChannel.invokeMethod('stop').catchError((_) => null);
+    sharing = false;
     _pc?.close();
     _pc = null;
     _local?.getTracks().forEach((t) => t.stop());
@@ -378,6 +441,7 @@ class _CallPanel extends StatelessWidget {
               Text(displayName(peer), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
               Text(label, style: const TextStyle(color: Colors.white70, fontSize: 16)),
+              if (c.sharing) const Padding(padding: EdgeInsets.only(top: 10), child: Text('You are sharing your screen', style: TextStyle(color: Colors.lightGreenAccent))),
             ]),
           ),
           Padding(
@@ -389,6 +453,7 @@ class _CallPanel extends StatelessWidget {
                   ])
                 : Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
                     if (connected) _Round(c.muted ? Icons.mic_off : Icons.mic, c.muted ? Colors.white : Colors.white24, c.muted ? 'Unmute' : 'Mute', c.toggleMute, dark: c.muted),
+                    if (connected) _Round(c.sharing ? Icons.stop_screen_share : Icons.screen_share, c.sharing ? Colors.white : Colors.white24, c.sharing ? 'Stop' : 'Share', c.sharing ? c.stopSharing : c.startSharing, dark: c.sharing),
                     _Round(Icons.call_end, Colors.red, 'End', c.hangUp),
                     if (connected) _Round(c.speaker ? Icons.volume_up : Icons.volume_down, c.speaker ? Colors.white : Colors.white24, 'Speaker', c.toggleSpeaker, dark: c.speaker),
                   ]),

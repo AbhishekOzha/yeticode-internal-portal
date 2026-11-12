@@ -79,7 +79,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _load,
-              child: ListView(padding: const EdgeInsets.only(bottom: 90), children: [
+              child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.only(bottom: 90), children: [
                 if (_approver && _team.isNotEmpty) ...[
                   const Padding(padding: EdgeInsets.all(16), child: Text('Waiting for your decision', style: TextStyle(fontWeight: FontWeight.w700))),
                   for (final l in _team)
@@ -103,12 +103,31 @@ class _LeaveScreenState extends State<LeaveScreen> {
                 const Padding(padding: EdgeInsets.all(16), child: Text('My requests', style: TextStyle(fontWeight: FontWeight.w700))),
                 if (mine.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No leave requests yet'))),
                 for (final l in mine)
-                  ListTile(
-                    title: Text('${l['kind_label']} · ${l['days']} day${l['days'] == 1 ? '' : 's'}'),
-                    subtitle: Text('${l['start_date']} → ${l['end_date']}${l['half_day'] == true ? ' (half day)' : ''}${(l['decision_note'] ?? '') != '' ? '\n${l['decision_note']}' : ''}'),
-                    trailing: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Chip(label: Text(l['status'], style: const TextStyle(fontSize: 11, color: Colors.white)), backgroundColor: _color(l['status']), visualDensity: VisualDensity.compact),
-                      if (l['status'] == 'pending') GestureDetector(onTap: () => _cancel(l), child: const Text('Cancel', style: TextStyle(fontSize: 12, color: Colors.red))),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('${l['kind_label']} · ${l['days']} day${l['days'] == 1 ? '' : 's'}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                          const SizedBox(height: 2),
+                          Text('${l['start_date']} → ${l['end_date']}${l['half_day'] == true ? ' (half day)' : ''}', style: Theme.of(context).textTheme.bodyMedium),
+                          if ((l['decision_note'] ?? '') != '') Text(l['decision_note'], style: Theme.of(context).textTheme.bodySmall),
+                        ]),
+                      ),
+                      const SizedBox(width: 8),
+                      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(color: _color(l['status']), borderRadius: BorderRadius.circular(12)),
+                          child: Text(l['status'], style: const TextStyle(fontSize: 12, color: Colors.white)),
+                        ),
+                        if (l['status'] == 'pending')
+                          TextButton(
+                            onPressed: () => _cancel(l),
+                            style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 28), foregroundColor: Colors.red),
+                            child: const Text('Cancel'),
+                          ),
+                      ]),
                     ]),
                   ),
               ]),

@@ -4,6 +4,7 @@ import { App, Badge, Button, Card, Empty, Flex, Grid, Input, Skeleton, Tooltip, 
 import { teamApi } from '../api'
 import { NotificationSwitch } from '../components/NotificationSwitch'
 import { ChatAttachment } from '../components/ChatAttachment'
+import { isGif } from '../team'
 import { GroupAvatar, GroupModal, OnlineAvatar, ReceiptLabel, Ticks } from '../components/ChatBits'
 import { PersonAvatar } from '../components/People'
 import { VoiceRecorder } from '../components/VoiceRecorder'
@@ -263,7 +264,7 @@ function Conversation({ me, target, people, onBack, onSent, onManageGroup }) {
                     >
                       {m.audio && <audio controls preload="metadata" src={m.audio} aria-label="Voice message" />}
                       {m.file && <ChatAttachment file={m.file} mine={mine} />}
-                      {m.body}
+                      {isGif(m.body) ? <img src={m.body} alt="GIF" className="chat-gif" loading="lazy" /> : m.body}
                       <span className="chat-time">
                         <span className="chat-time-text">{timeOf(m.created_at)}</span>
                         {mine && <Ticks message={m} receipts={receipts} />}

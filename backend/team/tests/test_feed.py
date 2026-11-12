@@ -90,3 +90,30 @@ class FeedTests(TestCase):
         Story.objects.filter(pk=story["id"]).update(created_at=timezone.now() - datetime.timedelta(hours=25))
         self.assertEqual(a.get("/api/feed/stories/").json()["results"], [])
         self.assertEqual(a.get(story["image"]).status_code, 404)
+
+
+class GifTests(TestCase):
+    def setUp(self):
+        self.a = User.objects.create_user(username="asha", password=PASSWORD, role=role("content", "content_writer"))
+        self.dev = User.objects.create_user(username="dev", password=PASSWORD, role=role("web", "web_developer"))
+
+    def client_for(self, user):
+        client = APIClient()
+        client.force_authenticate(user)
+        return client
+
+    @override_settings(GIPHY_API_KEY="")
+    def test_not_set_up(self):
+        self.assertEqual(self.client_for(self.a).get("/api/chat/gifs/").status_code, 503)
+
+    @override_settings(GIPHY_API_KEY="k")
+    def test_search_returns_urls_and_is_team_only(self):
+        from unittest import mock
+
+        data = {"data": [{"id": "1", "images": {"fixed_height": {"url": "https://media1.giphy.com/x/200.gif?cid=1"}, "fixed_width_small": {"url": "https://media1.giphy.com/x/100w.gif"}}}, {"id": "2", "images": {}}]}
+        with mock.patch("team.gifs.giphy", return_value=data) as search:
+            res = self.client_for(self.a).get("/api/chat/gifs/?q=cat&type=stickers").json()
+            search.assert_called_once_with("stickers", "cat")
+        self.assertEqual(res["results"], [{"id": "1", "url": "https://media1.giphy.com/x/200.gif", "preview": "https://media1.giphy.com/x/100w.gif"}])
+        self.assertEqual(self.client_for(self.dev).get("/api/chat/gifs/").status_code, 403)
+        self.assertEqual(self.client_for(self.a).get("/api/chat/gifs/?type=bad").status_code, 400)

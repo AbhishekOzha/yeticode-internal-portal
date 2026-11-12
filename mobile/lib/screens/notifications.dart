@@ -45,11 +45,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       appBar: AppBar(title: const Text('Notifications'), actions: [TextButton(onPressed: _readAll, child: const Text('Mark all read'))]),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _items.isEmpty
-              ? const Center(child: Text('Nothing new'))
-              : RefreshIndicator(
+          : RefreshIndicator(
                   onRefresh: _load,
-                  child: ListView(children: [
+                  child: ListView(physics: const AlwaysScrollableScrollPhysics(), children: [
+                    if (_items.isEmpty) const Padding(padding: EdgeInsets.all(48), child: Center(child: Text('Nothing new'))),
                     for (final n in _items)
                       ListTile(
                         leading: Icon(n['read'] == true ? Icons.notifications_none : Icons.notifications_active, color: n['read'] == true ? null : Theme.of(context).colorScheme.primary),

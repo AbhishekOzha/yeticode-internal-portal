@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -17,7 +18,8 @@ class FeedScreen extends StatefulWidget {
   State<FeedScreen> createState() => _FeedScreenState();
 }
 
-class _FeedScreenState extends State<FeedScreen> {
+class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
+  Timer? _auto;
   final _scroll = ScrollController();
   List<Json> _posts = [];
   List<Json> _stories = [];
@@ -30,11 +32,26 @@ class _FeedScreenState extends State<FeedScreen> {
     _scroll.addListener(() {
       if (_more && !_loadingMore && _scroll.position.extentAfter < 400) _loadMore();
     });
+    WidgetsBinding.instance.addObserver(this);
+    _auto = Timer.periodic(const Duration(seconds: 30), (_) => _quietRefresh());
+    _load();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _quietRefresh();
+  }
+
+  // Refresh from the top without jumping if you're scrolled down reading.
+  void _quietRefresh() {
+    if (_scroll.hasClients && _scroll.offset > 80) return;
     _load();
   }
 
   @override
   void dispose() {
+    _auto?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _scroll.dispose();
     super.dispose();
   }
@@ -125,6 +142,7 @@ class _FeedScreenState extends State<FeedScreen> {
             ? const Center(child: CircularProgressIndicator())
             : ListView.builder(
                 controller: _scroll,
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.only(bottom: 90),
                 itemCount: _posts.length + 2,
                 itemBuilder: (context, i) {

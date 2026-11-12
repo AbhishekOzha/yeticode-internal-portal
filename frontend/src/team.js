@@ -175,3 +175,8 @@ export const CallContext = createContext({ call: null, startCall: () => {} })
 export function useCall() {
   return useContext(CallContext)
 }
+
+// A GIF or sticker is a chat message whose whole body is its Giphy picture address.
+export function isGif(body) {
+  return /^https:\/\/media\d*\.giphy\.com\/\S+\.(gif|webp)$/i.test(body ?? '')
+}

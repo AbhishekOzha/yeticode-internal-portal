@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import calls, chat, feed, leave, reviews, views
+from . import calls, chat, feed, gifs, leave, reviews, views
 
 urlpatterns = [
     path("team/office-hours/", views.OfficeHoursListView.as_view(), name="office-hours"),
@@ -10,6 +10,7 @@ urlpatterns = [
     path("chat/messages/", chat.ChatMessagesView.as_view(), name="chat-messages"),
     path("chat/messages/<uuid:pk>/audio/", chat.ChatAudioView.as_view(), name="chat-audio"),
     path("chat/messages/<uuid:pk>/file/", chat.ChatFileView.as_view(), name="chat-file"),
+    path("chat/gifs/", gifs.GifSearchView.as_view(), name="chat-gifs"),
     path("chat/read/", chat.ChatReadView.as_view(), name="chat-read"),
     path("chat/updates/", chat.ChatUpdatesView.as_view(), name="chat-updates"),
     path("chat/groups/", chat.ChatGroupsView.as_view(), name="chat-groups"),
