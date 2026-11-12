@@ -103,6 +103,8 @@ class Api {
     return r == null ? null : Map<String, dynamic>.from(r);
   }
 
+  Future<dynamic> send(String method, String path, [dynamic body]) => _send(method, path, body: body);
+
   Future<Json?> delete(String path) async {
     final r = await _send('DELETE', path);
     return r is Map ? Map<String, dynamic>.from(r) : null;

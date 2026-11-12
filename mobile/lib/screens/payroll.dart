@@ -327,6 +327,17 @@ class _StaffPayScreenState extends State<StaffPayScreen> {
                     ]),
                   ),
                 ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: FilledButton.tonalIcon(
+                  onPressed: () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => DailyLogScreen(staff: _staff, month: widget.month)));
+                    _load();
+                  },
+                  icon: const Icon(Icons.calendar_month),
+                  label: const Text('Daily log (hours & words by day)'),
+                ),
+              ),
               const Padding(padding: EdgeInsets.fromLTRB(4, 12, 4, 4), child: Text('Extras this month', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
               if (_extras.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No extras yet.')),
               for (final e in _extras)
@@ -493,4 +504,144 @@ class _ExtraSheetState extends State<_ExtraSheet> {
       ),
     );
   }
+}
+
+/// Day-by-day extra hours and words for one person and month, like the website's daily log.
+class DailyLogScreen extends StatefulWidget {
+  const DailyLogScreen({super.key, required this.staff, required this.month});
+  final Json staff;
+  final String month;
+  @override
+  State<DailyLogScreen> createState() => _DailyLogScreenState();
+}
+
+class _DailyLogScreenState extends State<DailyLogScreen> {
+  final Map<String, TextEditingController> _hours = {}, _words = {};
+  final Map<String, String> _amount = {};
+  late final List<DateTime> _days;
+  bool _loading = true, _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final parts = widget.month.split('-').map(int.parse).toList();
+    final last = DateTime(parts[0], parts[1] + 1, 0).day;
+    _days = [for (var d = 1; d <= last; d++) DateTime(parts[0], parts[1], d)];
+    for (final d in _days) {
+      final key = _key(d);
+      _hours[key] = TextEditingController();
+      _words[key] = TextEditingController();
+    }
+    _load();
+  }
+
+  @override
+  void dispose() {
+    for (final c in [..._hours.values, ..._words.values]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  String _key(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
+
+  Future<void> _load() async {
+    try {
+      final res = await api.get('/payroll/staff/${widget.staff['id']}/daily/?month=${widget.month}');
+      for (final d in (res['days'] as List)) {
+        final key = d['date'] as String;
+        _hours[key]?.text = d['hours'] == null ? '' : '${d['hours']}'.replaceAll(RegExp(r'\.00$'), '');
+        _words[key]?.text = d['words'] == null ? '' : '${d['words']}';
+        _amount[key] = d['amount'].toString();
+      }
+      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        toast(context, e);
+      }
+    }
+  }
+
+  Future<void> _save() async {
+    FocusScope.of(context).unfocus();
+    setState(() => _busy = true);
+    try {
+      final days = [
+        for (final d in _days)
+          if (_hours[_key(d)]!.text.trim().isNotEmpty || _words[_key(d)]!.text.trim().isNotEmpty)
+            {
+              'date': _key(d),
+              'hours': _hours[_key(d)]!.text.trim().isEmpty ? null : _hours[_key(d)]!.text.trim(),
+              'words': _words[_key(d)]!.text.trim().isEmpty ? null : int.tryParse(_words[_key(d)]!.text.trim()),
+            },
+      ];
+      await api.send('PUT', '/payroll/staff/${widget.staff['id']}/daily/?month=${widget.month}', {'days': days});
+      await _load();
+      if (mounted) toast(context, 'Daily log saved');
+    } catch (e) {
+      if (mounted) toast(context, e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    num hoursTotal = 0, wordsTotal = 0;
+    for (final d in _days) {
+      hoursTotal += num.tryParse(_hours[_key(d)]!.text) ?? 0;
+      wordsTotal += num.tryParse(_words[_key(d)]!.text) ?? 0;
+    }
+    return Scaffold(
+      appBar: AppBar(title: Text('Daily log · ${monthLabel(widget.month)}'), actions: [TextButton(onPressed: _busy ? null : _save, child: Text(_busy ? 'Saving…' : 'Save'))]),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(children: [
+              Container(
+                width: double.infinity,
+                color: scheme.primaryContainer,
+                padding: const EdgeInsets.all(12),
+                child: Text('${displayName(widget.staff)} · ${count(hoursTotal)} hours · ${count(wordsTotal)} words', textAlign: TextAlign.center, style: TextStyle(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w600)),
+              ),
+              Expanded(
+                child: ListView.separated(
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                  itemCount: _days.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, i) {
+                    final d = _days[i];
+                    final key = _key(d);
+                    final weekend = d.weekday == DateTime.saturday;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(children: [
+                        SizedBox(
+                          width: 64,
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(DateFormat('d MMM').format(d), style: const TextStyle(fontWeight: FontWeight.w700)),
+                            Text(DateFormat('EEE').format(d), style: TextStyle(fontSize: 11, color: weekend ? Colors.red : null)),
+                          ]),
+                        ),
+                        Expanded(child: _cell(_hours[key]!, 'hours', decimal: true)),
+                        const SizedBox(width: 8),
+                        Expanded(child: _cell(_words[key]!, 'words')),
+                        SizedBox(width: 70, child: Text(_amount[key] == null ? '' : npr(_amount[key]).replaceFirst('NPR ', ''), textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
+                      ]),
+                    );
+                  },
+                ),
+              ),
+            ]),
+    );
+  }
+
+  Widget _cell(TextEditingController c, String hint, {bool decimal = false}) => TextField(
+        controller: c,
+        onChanged: (_) => setState(() {}),
+        keyboardType: TextInputType.numberWithOptions(decimal: decimal),
+        decoration: InputDecoration(hintText: hint, isDense: true, border: const OutlineInputBorder()),
+      );
 }
