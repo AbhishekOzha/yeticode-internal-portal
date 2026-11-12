@@ -456,6 +456,12 @@ export default function Payroll({ user }) {
 
   return (
     <Flex vertical gap={20}>
+      <Alert
+        type="info"
+        showIcon
+        message="Payroll is only for the Academic Content Writing team at the moment."
+        description="Other teams will be added in a later update."
+      />
       <Flex justify="space-between" align="flex-end" wrap gap={16}>
         <div>
           <Typography.Title level={3} style={{ marginBottom: 4 }}>

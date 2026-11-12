@@ -24,6 +24,7 @@ from accounts.serializers import ImageUrlField
 
 from accounts.models import CompanySettings
 
+from .encouragement import cheer
 from .models import MAX_HOURS_PER_DAY, PAYROLL_UNIT, PayExtra, StaffPay, extra_amount
 from .payslip import payslip, unpaid_leave
 
@@ -300,7 +301,8 @@ class PayExtraViewSet(
         return extras
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        extra = serializer.save(created_by=self.request.user)
+        cheer(extra.staff, extra.month)
 
     def perform_destroy(self, instance):
         check_not_own_pay(self.request.user, instance.staff)
@@ -398,4 +400,5 @@ class DailyLogView(APIView):
             # Days not sent at all had no extra work.
             for entry in existing.values():
                 entry.delete()
+        cheer(user, month)
         return self.response(user, month)

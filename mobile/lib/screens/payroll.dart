@@ -79,6 +79,21 @@ class _PayrollScreenState extends State<PayrollScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Theme.of(context).colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(14)),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(Icons.info_outline, color: Theme.of(context).colorScheme.onSecondaryContainer),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Payroll is only for the Academic Content Writing team at the moment. Other teams will be added in a later update.',
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSecondaryContainer),
+                ),
+              ),
+            ]),
+          ),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             IconButton.filledTonal(onPressed: () => _go(-1), icon: const Icon(Icons.chevron_left)),
             Text(monthLabel(_month), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),

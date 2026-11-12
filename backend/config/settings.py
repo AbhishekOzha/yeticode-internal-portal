@@ -152,6 +152,9 @@ CALL_TURN_URL = os.environ.get("CALL_TURN_URL", "")
 CALL_TURN_USERNAME = os.environ.get("CALL_TURN_USERNAME", "")
 CALL_TURN_PASSWORD = os.environ.get("CALL_TURN_PASSWORD", "")
 
+# Writers get a cheer when their extras pass this share of their monthly salary.
+EXTRA_GOAL_PERCENT = int(os.environ.get("EXTRA_GOAL_PERCENT", "20"))
+
 # GIFs and stickers in chat come from Giphy (free key from developers.giphy.com). Empty = the picker says GIFs aren't set up.
 GIPHY_API_KEY = os.environ.get("GIPHY_API_KEY", "")
 

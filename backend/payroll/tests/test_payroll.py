@@ -335,3 +335,48 @@ class PayslipTests(PayrollTestCase):
         self.leave("2026-05-05", "2026-05-05", kind="casual")
         with mock.patch("payroll.payslip.PAID_LEAVE_KINDS", frozenset({"sick"})):
             self.assertEqual(self.slip()["leave_days"], "1")
+
+
+class EncouragementTests(PayrollTestCase):
+    def setUp(self):
+        super().setUp()
+        StaffPay.objects.create(user=self.writer, monthly_salary=Decimal("20000"))
+        self.as_user(self.hr)
+
+    def cheers(self):
+        return list(self.writer.notifications.filter(kind__startswith="extra_").order_by("created_at"))
+
+    def test_first_extra_congratulates_once_a_day(self):
+        self.add_extra(kind="effort", amount="500")
+        self.add_extra(kind="effort", amount="300")
+        notes = self.cheers()
+        self.assertEqual([n.kind for n in notes], ["extra_start"])
+        self.assertIn("Congrats", notes[0].title)
+
+    def test_goal_at_twenty_percent_of_salary(self):
+        # 20% of 20,000 = 4,000.
+        self.add_extra(kind="effort", amount="4000")
+        note = self.cheers()[0]
+        self.assertEqual(note.kind, "extra_goal_2026-09")
+        self.assertIn("20%", note.title)
+        self.assertIn("NPR 4,000", note.body)
+
+    def test_streak_over_several_days(self):
+        from payroll.encouragement import cheer
+        import datetime
+
+        month = datetime.date(2026, 9, 1)
+        for day in (1, 2, 3):
+            PayExtra.objects.create(
+                staff=self.writer, month=month, date=datetime.date(2026, 9, day), kind="words",
+                quantity=Decimal("1000"), per_quantity=Decimal("6000"), per_amount=Decimal("1000"), amount=Decimal("166.67"),
+            )
+        note = cheer(self.writer, month)
+        self.assertEqual(note.kind, "extra_streak")
+        self.assertIn("3 days", note.title)
+
+    def test_nothing_without_extras(self):
+        from payroll.encouragement import cheer
+        import datetime
+
+        self.assertIsNone(cheer(self.writer, datetime.date(2026, 9, 1)))
