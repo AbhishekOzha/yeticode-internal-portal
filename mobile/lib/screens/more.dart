@@ -5,7 +5,9 @@ import '../api.dart';
 import '../state.dart';
 import '../util.dart';
 import '../widgets/api_image.dart';
+import '../payroll.dart';
 import 'leave.dart';
+import 'payroll.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
@@ -20,15 +22,35 @@ class MoreScreen extends StatelessWidget {
       'avatar': me['avatar'],
     };
     return ListView(children: [
-      ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Avatar(person, radius: 28),
-        title: Text(displayName(person), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-        subtitle: Text('${me['role']?['name'] ?? (me['is_super_admin'] == true ? 'Super Admin' : '')}\n${me['email'] ?? ''}'),
-        isThreeLine: true,
+      Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [Color(0xFF2F54EB), Color(0xFF7B1FA2)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Row(children: [
+          Avatar(person, radius: 32),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(displayName(person), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 2),
+              Text('${me['role']?['name'] ?? (me['is_super_admin'] == true ? 'Super Admin' : '')}', style: const TextStyle(color: Colors.white70)),
+              Text('${me['email'] ?? ''}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            ]),
+          ),
+        ]),
       ),
-      const Divider(),
-      if (state.inTeam) ListTile(leading: const Icon(Icons.event_busy_outlined), title: const Text('Leave'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LeaveScreen()))),
+      if (state.inTeam) ListTile(leading: const CircleAvatar(backgroundColor: Color(0x1FF57C00), child: Icon(Icons.event_busy_outlined, color: Color(0xFFF57C00))), title: const Text('Leave'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LeaveScreen()))),
+      if (canManagePayroll(me))
+        ListTile(
+          leading: const CircleAvatar(backgroundColor: Color(0x1F2F54EB), child: Icon(Icons.payments_outlined, color: Color(0xFF2F54EB))),
+          title: const Text('Payroll'),
+          subtitle: const Text('Salaries, word counts, hours and rates'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PayrollScreen())),
+        ),
       ListTile(leading: const Icon(Icons.dns_outlined), title: const Text('Server'), subtitle: Text(api.baseUrl)),
       ListTile(
         leading: const Icon(Icons.logout),

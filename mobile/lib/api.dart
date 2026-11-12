@@ -90,6 +90,9 @@ class Api {
   }
 
   Future<Json> get(String path) async => Map<String, dynamic>.from(await _send('GET', path));
+  Future<List<Json>> getList(String path) async =>
+      (await _send('GET', path) as List).map((e) => Map<String, dynamic>.from(e)).toList();
+
   Future<Json?> post(String path, [dynamic body]) async {
     final r = await _send('POST', path, body: body);
     return r == null ? null : Map<String, dynamic>.from(r);

@@ -103,8 +103,14 @@ class _LeaveScreenState extends State<LeaveScreen> {
                 const Padding(padding: EdgeInsets.all(16), child: Text('My requests', style: TextStyle(fontWeight: FontWeight.w700))),
                 if (mine.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No leave requests yet'))),
                 for (final l in mine)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border(left: BorderSide(color: _color(l['status']), width: 5)),
+                    ),
                     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
