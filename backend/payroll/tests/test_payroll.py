@@ -346,16 +346,28 @@ class EncouragementTests(PayrollTestCase):
     def cheers(self):
         return list(self.writer.notifications.filter(kind__startswith="extra_").order_by("created_at"))
 
+    def add_words(self, quantity, notify=True, **data):
+        return self.add_extra(kind="words", quantity=quantity, notify=notify, **data)
+
     def test_first_extra_congratulates_once_a_day(self):
-        self.add_extra(kind="effort", amount="500")
-        self.add_extra(kind="effort", amount="300")
+        self.add_words(3000)
+        self.add_words(1000)
         notes = self.cheers()
         self.assertEqual([n.kind for n in notes], ["extra_start"])
         self.assertIn("Congrats", notes[0].title)
 
+    def test_nothing_is_sent_unless_the_admin_says_so(self):
+        self.add_words(3000, notify=False)
+        self.assertEqual(self.cheers(), [])
+
+    def test_bonuses_are_never_announced(self):
+        self.add_extra(kind="performance", amount="4000", notify=True)
+        self.add_extra(kind="effort", amount="500", notify=True)
+        self.assertEqual(self.cheers(), [])
+
     def test_goal_at_twenty_percent_of_salary(self):
-        # 20% of 20,000 = 4,000.
-        self.add_extra(kind="effort", amount="4000")
+        # 20% of 20,000 = 4,000: 24,000 words at 6,000 words = NPR 1,000.
+        self.add_words(24000)
         note = self.cheers()[0]
         self.assertEqual(note.kind, "extra_goal_2026-09")
         self.assertIn("20%", note.title)
@@ -380,3 +392,45 @@ class EncouragementTests(PayrollTestCase):
         import datetime
 
         self.assertIsNone(cheer(self.writer, datetime.date(2026, 9, 1)))
+
+
+class SalaryAndDailyLogNoticeTests(PayrollTestCase):
+    def setUp(self):
+        super().setUp()
+        self.as_user(self.hr)
+
+    def set_salary(self, amount, **extra):
+        return self.client.patch(f"/api/payroll/staff/{self.writer.pk}/?month=2026-09", {"monthly_salary": amount, **extra}, format="json")
+
+    def notes(self, kind):
+        return list(self.writer.notifications.filter(kind=kind))
+
+    def test_salary_change_notifies_only_when_asked(self):
+        self.set_salary("20000")
+        self.assertEqual(self.notes("salary_changed"), [])
+        self.set_salary("25000", notify=True)
+        up = self.notes("salary_changed")[0]
+        self.assertEqual(up.title, "Your monthly salary was increased")
+        self.assertEqual(up.body, "From NPR 20,000 to NPR 25,000.")
+        self.set_salary("22000", notify=True)
+        self.assertEqual(self.writer.notifications.filter(title="Your monthly salary was decreased").count(), 1)
+
+    def test_first_salary_and_unchanged_salary(self):
+        self.set_salary("20000", notify=True)
+        self.assertEqual(self.notes("salary_changed")[0].title, "Your monthly salary has been set")
+        self.set_salary("20000", notify=True)
+        self.assertEqual(len(self.notes("salary_changed")), 1)  # nothing changed, nothing sent
+
+    def test_rate_only_change_sends_nothing(self):
+        self.client.patch(f"/api/payroll/staff/{self.writer.pk}/?month=2026-09", {"words_rate_amount": "1200", "notify": True}, format="json")
+        self.assertEqual(self.notes("salary_changed"), [])
+
+    def test_daily_log_notice(self):
+        days = {"days": [{"date": "2026-09-02", "hours": "2", "words": 3000}]}
+        url = f"/api/payroll/staff/{self.writer.pk}/daily/?month=2026-09"
+        self.client.put(url, days, format="json")
+        self.assertEqual(self.notes("daily_log_updated"), [])
+        self.client.put(url, {**days, "notify": True}, format="json")
+        note = self.notes("daily_log_updated")[0]
+        self.assertIn("September 2026", note.title)
+        self.assertIn("2 hours and 3,000 words", note.body)

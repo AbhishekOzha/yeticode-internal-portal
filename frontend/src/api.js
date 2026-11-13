@@ -75,8 +75,8 @@ export const api = {
   payrollStaff: (month) => request(`/payroll/staff/?month=${month}`),
   updateStaffPay: (id, month, data) => request(`/payroll/staff/${id}/?month=${month}`, { method: 'PATCH', body: data }),
   dailyLog: (id, month) => request(`/payroll/staff/${id}/daily/?month=${month}`),
-  saveDailyLog: (id, month, days) =>
-    request(`/payroll/staff/${id}/daily/?month=${month}`, { method: 'PUT', body: { days } }),
+  saveDailyLog: (id, month, days, notify = false) =>
+    request(`/payroll/staff/${id}/daily/?month=${month}`, { method: 'PUT', body: { days, notify } }),
   payslip: (id, month) => request(`/payroll/staff/${id}/payslip/?month=${month}`),
   payrollExtras: (month) => request(`/payroll/extras/?month=${month}`),
   addPayExtra: (data) => request('/payroll/extras/', { method: 'POST', body: data }),

@@ -38,3 +38,19 @@ void toast(BuildContext context, Object message) {
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(message.toString())));
 }
+
+/// "Tell them about this change?" true = notify, false = save quietly.
+Future<bool> askNotify(BuildContext context, String who, String what) async {
+  final answer = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Notify $who?'),
+      content: Text('Send $who a notification about $what.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No, just save')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Yes, notify')),
+      ],
+    ),
+  );
+  return answer ?? false;
+}

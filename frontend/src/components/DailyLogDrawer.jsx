@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { App, Button, Drawer, Flex, InputNumber, Skeleton, Statistic, Table, Tag, Typography } from 'antd'
 import { api } from '../api'
+import { askNotify } from '../askNotify'
 import { displayName } from '../people'
 import { count, daysOf, monthLabel, npr, rateAmount, todayISO } from '../payroll'
 
@@ -13,7 +14,7 @@ function sameDay(a, b) {
 // One row per day: type the extra hours and words worked that day and leave
 // the rest empty. Each day is priced on its own.
 export default function DailyLogDrawer({ staff, month, onClose, onSaved }) {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const [saved, setSaved] = useState(null) // date -> { hours, words, amount } from the server
   const [entries, setEntries] = useState({}) // date -> { hours, words } being edited
   const [busy, setBusy] = useState(false)
@@ -79,7 +80,8 @@ export default function DailyLogDrawer({ staff, month, onClose, onSaved }) {
       .filter(([, e]) => Number(e.hours) || Number(e.words))
       .map(([date, e]) => ({ date, hours: e.hours || null, words: e.words || null }))
     try {
-      await api.saveDailyLog(staff.id, month, days)
+      const notify = await askNotify(modal, displayName(staff), 'their updated daily log')
+      await api.saveDailyLog(staff.id, month, days, notify)
       message.success(`Daily log saved for ${displayName(staff)}.`)
       onSaved()
     } catch (err) {

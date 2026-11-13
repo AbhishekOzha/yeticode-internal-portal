@@ -44,12 +44,19 @@ class LeaveTests(TestCase):
         self.assertEqual({a["username"] for a in response.json()["notified"]}, {"pm", "hr"})
 
         notified = set(Notification.objects.filter(kind="leave_requested").values_list("recipient__username", flat=True))
-        self.assertEqual(notified, {"pm", "hr"})  # not other staff, other units or the applicant
+        self.assertEqual(notified, {"pm", "hr", "boss"})  # approvers and Super Admins; not other staff, other units or the applicant
         self.as_user(self.production)
         bell = self.client.get("/api/notifications/").json()
         self.assertEqual(bell["unread"], 1)
         self.assertEqual(bell["notifications"][0]["title"], "Asha applied for casual leave (Unpaid)")
         self.assertEqual(bell["notifications"][0]["link"], "leave")
+
+    def test_applicant_gets_a_receipt_when_applying(self):
+        self.as_user(self.writer)
+        self.apply()
+        receipt = Notification.objects.get(recipient=self.writer, kind="leave_sent")
+        self.assertEqual(receipt.title, "Your leave request was sent")
+        self.assertIn("waiting for", receipt.body)
 
     def test_approve_and_the_applicant_is_notified(self):
         self.as_user(self.writer)
@@ -146,3 +153,4 @@ class LeaveTests(TestCase):
         self.assertEqual(kinds["unpaid"], "Unpaid leave")
         response = self.apply(kind="sick")
         self.assertEqual((response.json()["kind_label"], response.json()["paid"]), ("Sick leave (Unpaid)", False))
+

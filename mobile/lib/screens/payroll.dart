@@ -246,7 +246,7 @@ class _StaffPayScreenState extends State<StaffPayScreen> {
     final saved = await showModalBottomSheet<Json>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _PaySetupSheet(pay: Map<String, dynamic>.from(_staff['pay']), staffId: _id, month: widget.month),
+      builder: (_) => _PaySetupSheet(pay: Map<String, dynamic>.from(_staff['pay']), staff: _staff, month: widget.month),
     );
     if (saved != null) {
       setState(() => _staff = saved);
@@ -255,7 +255,7 @@ class _StaffPayScreenState extends State<StaffPayScreen> {
   }
 
   Future<void> _addExtra() async {
-    final added = await showModalBottomSheet<bool>(context: context, isScrollControlled: true, builder: (_) => _ExtraSheet(staffId: _id, month: widget.month, pay: Map<String, dynamic>.from(_staff['pay'])));
+    final added = await showModalBottomSheet<bool>(context: context, isScrollControlled: true, builder: (_) => _ExtraSheet(staffId: _id, staffName: displayName(_staff), month: widget.month, pay: Map<String, dynamic>.from(_staff['pay'])));
     if (added == true) _load();
   }
 
@@ -390,9 +390,9 @@ String _kindLabel(Json e) => switch (e['kind']) {
     };
 
 class _PaySetupSheet extends StatefulWidget {
-  const _PaySetupSheet({required this.pay, required this.staffId, required this.month});
-  final Json pay;
-  final String staffId, month;
+  const _PaySetupSheet({required this.pay, required this.staff, required this.month});
+  final Json pay, staff;
+  final String month;
   @override
   State<_PaySetupSheet> createState() => _PaySetupSheetState();
 }
@@ -413,7 +413,12 @@ class _PaySetupSheetState extends State<_PaySetupSheet> {
   Future<void> _save() async {
     setState(() => _busy = true);
     try {
-      final saved = await api.patch('/payroll/staff/${widget.staffId}/?month=${widget.month}', {
+      final before = num.tryParse('${widget.pay['monthly_salary'] ?? ''}');
+      final after = num.tryParse(_salary.text.trim());
+      final changed = after != null && after != before;
+      final notify = changed ? await askNotify(context, displayName(widget.staff), 'their salary change') : false;
+      final saved = await api.patch('/payroll/staff/${widget.staff['id']}/?month=${widget.month}', {
+        'notify': notify,
         'monthly_salary': _salary.text.trim().isEmpty ? null : _salary.text.trim(),
         'words_per_rate': int.tryParse(_wordsPer.text.trim()) ?? 6000,
         'words_rate_amount': _wordsAmt.text.trim(),
@@ -448,8 +453,8 @@ class _PaySetupSheetState extends State<_PaySetupSheet> {
 }
 
 class _ExtraSheet extends StatefulWidget {
-  const _ExtraSheet({required this.staffId, required this.month, required this.pay});
-  final String staffId, month;
+  const _ExtraSheet({required this.staffId, required this.staffName, required this.month, required this.pay});
+  final String staffId, staffName, month;
   final Json pay;
   @override
   State<_ExtraSheet> createState() => _ExtraSheetState();
@@ -466,7 +471,10 @@ class _ExtraSheetState extends State<_ExtraSheet> {
   Future<void> _save() async {
     setState(() => _busy = true);
     try {
+      // Words and hours extras can be announced to the writer; performance and effort bonuses never are.
+      final notify = _measured ? await askNotify(context, widget.staffName, 'this extra work') : false;
       await api.post('/payroll/extras/', {
+        'notify': notify,
         'staff': widget.staffId,
         'month': widget.month,
         'kind': _kind,
@@ -591,7 +599,8 @@ class _DailyLogScreenState extends State<DailyLogScreen> {
               'words': _words[_key(d)]!.text.trim().isEmpty ? null : int.tryParse(_words[_key(d)]!.text.trim()),
             },
       ];
-      await api.send('PUT', '/payroll/staff/${widget.staff['id']}/daily/?month=${widget.month}', {'days': days});
+      final notify = await askNotify(context, displayName(widget.staff), 'their updated daily log');
+      await api.send('PUT', '/payroll/staff/${widget.staff['id']}/daily/?month=${widget.month}', {'days': days, 'notify': notify});
       await _load();
       if (mounted) toast(context, 'Daily log saved');
     } catch (e) {

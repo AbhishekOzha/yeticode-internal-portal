@@ -44,7 +44,8 @@ def streak_days(extras):
 
 def cheer(staff, month):
     """Send the writer a message about this month's extras, if there is one to send. Returns it or None."""
-    extras = list(PayExtra.objects.filter(staff=staff, month=month))
+    # Only words and hours count: performance and effort bonuses are never announced.
+    extras = list(PayExtra.objects.filter(staff=staff, month=month, kind__in=DAILY_KINDS))
     total = sum((e.amount for e in extras), Decimal("0"))
     if not extras or total <= 0:
         return None

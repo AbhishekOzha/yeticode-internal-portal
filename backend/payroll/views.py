@@ -24,7 +24,9 @@ from accounts.serializers import ImageUrlField
 
 from accounts.models import CompanySettings
 
-from .encouragement import cheer
+from notifications.models import notify
+
+from .encouragement import cheer, nrs
 from .models import MAX_HOURS_PER_DAY, PAYROLL_UNIT, PayExtra, StaffPay, extra_amount
 from .payslip import payslip, unpaid_leave
 
@@ -56,6 +58,12 @@ def payroll_staff():
         .select_related("role", "pay")
         .order_by("role__rank", "first_name", "username")
     )
+
+
+def wants_notify(request):
+    """The admin's answer to "Tell them about this change?" (the apps ask before saving)."""
+    value = request.data.get("notify") if hasattr(request.data, "get") else None
+    return value in (True, "true", "True", "1", 1)
 
 
 def check_not_own_pay(actor, staff):
@@ -163,10 +171,20 @@ class StaffPayDetailView(APIView):
     def patch(self, request, pk):
         user = get_object_or_404(payroll_staff(), pk=pk)
         check_not_own_pay(request.user, user)
+        old_salary = pay_for(user).monthly_salary
         serializer = StaffPaySerializer(pay_for(user), data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save(user=user)
         user.refresh_from_db()
+        new_salary = pay_for(user).monthly_salary
+        if wants_notify(request) and new_salary is not None and new_salary != old_salary:
+            if old_salary is None:
+                title, body = "Your monthly salary has been set", f"Your monthly salary is now {nrs(new_salary)}."
+            else:
+                word = "increased" if new_salary > old_salary else "decreased"
+                title = f"Your monthly salary was {word}"
+                body = f"From {nrs(old_salary)} to {nrs(new_salary)}."
+            notify([user], "salary_changed", title, body)
         month = parse_month(request.query_params.get("month"))
         return Response(staff_row(user, extras_by_staff(month, [user.pk])[user.pk], month))
 
@@ -302,7 +320,9 @@ class PayExtraViewSet(
 
     def perform_create(self, serializer):
         extra = serializer.save(created_by=self.request.user)
-        cheer(extra.staff, extra.month)
+        # Only words and hours extras are announced, and only if the admin said to.
+        if wants_notify(self.request) and extra.kind in PayExtra.MEASURED:
+            cheer(extra.staff, extra.month)
 
     def perform_destroy(self, instance):
         check_not_own_pay(self.request.user, instance.staff)
@@ -400,5 +420,18 @@ class DailyLogView(APIView):
             # Days not sent at all had no extra work.
             for entry in existing.values():
                 entry.delete()
-        cheer(user, month)
+        if wants_notify(request):
+            totals = {"hours": Decimal("0"), "words": 0}
+            for entry in self.entries(user, month):
+                if entry.kind == PayExtra.Kind.HOURS:
+                    totals["hours"] += entry.quantity
+                else:
+                    totals["words"] += int(entry.quantity)
+            notify(
+                [user],
+                "daily_log_updated",
+                f"Your daily log for {month:%B %Y} was updated",
+                f"{totals['hours'].normalize():f} hours and {totals['words']:,} words of extra work are recorded this month.",
+            )
+            cheer(user, month)
         return self.response(user, month)

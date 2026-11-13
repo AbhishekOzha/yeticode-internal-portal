@@ -24,6 +24,7 @@ import {
   Typography,
 } from 'antd'
 import { api } from '../api'
+import { askNotify } from '../askNotify'
 import DailyLogDrawer from '../components/DailyLogDrawer'
 import { PayslipModal } from '../components/PayslipModal'
 import { PersonCell } from '../components/People'
@@ -63,7 +64,7 @@ function RateInputs({ quantityName, amountName, unit }) {
 }
 
 function PaySetupDrawer({ staff, month, onClose, onSaved }) {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const [form] = Form.useForm()
   const [busy, setBusy] = useState(false)
 
@@ -82,7 +83,10 @@ function PaySetupDrawer({ staff, month, onClose, onSaved }) {
   async function handleFinish(values) {
     setBusy(true)
     try {
-      const saved = await api.updateStaffPay(staff.id, month, { ...values, note: (values.note || '').trim() })
+      const before = staff.pay.monthly_salary === null ? null : Number(staff.pay.monthly_salary)
+      const salaryChanged = values.monthly_salary !== null && values.monthly_salary !== undefined && values.monthly_salary !== before
+      const notify = salaryChanged ? await askNotify(modal, displayName(staff), 'their salary change') : false
+      const saved = await api.updateStaffPay(staff.id, month, { ...values, note: (values.note || '').trim(), notify })
       message.success(`Pay setup saved for ${displayName(staff)}.`)
       onSaved(saved)
     } catch (err) {
@@ -136,7 +140,7 @@ function PaySetupDrawer({ staff, month, onClose, onSaved }) {
 }
 
 function ExtraModal({ staff, month, onClose, onSaved }) {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const [form] = Form.useForm()
   const [busy, setBusy] = useState(false)
   // Each type has its own fields (words_quantity, hours_quantity, performance_amount, …),
@@ -174,6 +178,8 @@ function ExtraModal({ staff, month, onClose, onSaved }) {
       })
     else payload.amount = kindValue('amount')
     try {
+      // Words and hours extras can be announced to the writer; performance and effort bonuses never are.
+      payload.notify = measured ? await askNotify(modal, displayName(staff), 'this extra work') : false
       const saved = await api.addPayExtra(payload)
       message.success(`${npr(saved.amount)} added for ${displayName(staff)}.`)
       onSaved()

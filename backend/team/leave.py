@@ -16,11 +16,14 @@ from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from django.contrib.auth import get_user_model
+
 from notifications.models import notify
 
 from .models import LeaveRequest, leave_kind_label
 from .views import IsTeamMember, in_team, person, team_members
 
+User = get_user_model()
 APPROVER_CAPABILITIES = ["manage_unit_users", "manage_employee_records"]
 
 
@@ -46,6 +49,12 @@ def approvers_for(applicant):
         .exclude(pk=applicant.pk)
         .distinct()
     )
+
+
+def watchers_for(applicant):
+    """Everyone told about this person's leave: the unit's approvers and the Super Admins (who can decide it too)."""
+    admins = list(User.objects.filter(is_active=True, is_superuser=True))
+    return approvers_for(applicant) + [a for a in admins if a.pk != applicant.pk]
 
 
 class CanApproveLeave(BasePermission):
@@ -134,13 +143,21 @@ class MyLeaveView(APIView):
             leave = LeaveRequest.objects.create(user=me, **data)
             name = me.get_full_name() or me.username
             notify(
-                approvers,
+                watchers_for(me),
                 "leave_requested",
                 f"{name} applied for {leave.kind_label[0].lower()}{leave.kind_label[1:]}",
                 f"{date_range(leave)} · {leave.days:g} day{'s' if leave.days != 1 else ''}"
                 + (f" · “{leave.reason[:120]}”" if leave.reason else ""),
                 "leave",
             )
+        # A receipt for the applicant too, so they know it went through and to whom.
+        notify(
+            [me],
+            "leave_sent",
+            "Your leave request was sent",
+            f"{date_range(leave)} · waiting for " + (", ".join(u.get_full_name() or u.username for u in approvers) or "an approver"),
+            "leave",
+        )
         return Response(
             {**leave_data(leave, me), "notified": [person(u) for u in approvers]},
             status=status.HTTP_201_CREATED,
@@ -157,7 +174,7 @@ class CancelLeaveView(APIView):
         leave.status = LeaveRequest.Status.CANCELLED
         leave.save(update_fields=["status"])
         name = request.user.get_full_name() or request.user.username
-        notify(approvers_for(request.user), "leave_cancelled", f"{name} cancelled a leave request", date_range(leave), "leave")
+        notify(watchers_for(request.user), "leave_cancelled", f"{name} cancelled a leave request", date_range(leave), "leave")
         return Response(leave_data(leave, request.user))
 
 
@@ -212,7 +229,7 @@ class DecideLeaveView(APIView):
             "leave",
         )
         # Let the other approvers know it's been handled.
-        others = [u for u in approvers_for(leave.user) if u.pk != me.pk]
+        others = [u for u in watchers_for(leave.user) if u.pk != me.pk]
         name = leave.user.get_full_name() or leave.user.username
         notify(others, "leave_decided", f"{by} {verdict} {name}'s leave", date_range(leave), "leave")
         return Response(leave_data(leave, me))
