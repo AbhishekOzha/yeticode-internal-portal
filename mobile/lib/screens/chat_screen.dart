@@ -15,6 +15,7 @@ import 'package:record/record.dart';
 import '../api.dart';
 import '../call.dart';
 import '../state.dart';
+import '../theme.dart';
 import '../util.dart';
 import '../widgets/api_image.dart';
 import '../widgets/gif_picker.dart';
@@ -300,7 +301,11 @@ class _Bubble extends StatelessWidget {
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
         margin: const EdgeInsets.symmetric(vertical: 3),
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(16)),
+        decoration: BoxDecoration(
+          color: mine ? null : color,
+          gradient: mine ? brandGradient : null,
+          borderRadius: BorderRadius.only(topLeft: const Radius.circular(18), topRight: const Radius.circular(18), bottomLeft: Radius.circular(mine ? 18 : 4), bottomRight: Radius.circular(mine ? 4 : 18)),
+        ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
           if (sender != null) Text(sender!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg.withValues(alpha: 0.8))),
           if (message['audio'] != null) VoicePlayer(path: message['audio'], seconds: message['audio_duration'] ?? 0, color: fg),

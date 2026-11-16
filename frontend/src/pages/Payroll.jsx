@@ -163,12 +163,12 @@ function ExtraModal({ staff, month, onClose, onSaved }) {
       rates[`${measuredKind}_per_quantity`] = per_quantity
       rates[`${measuredKind}_per_amount`] = per_amount
     }
-    form.setFieldsValue({ kind: 'words', date: staff.pay.daily_extra && inMonth ? today : '', ...rates })
+    form.setFieldsValue({ kind: 'words', date: inMonth ? today : bounds.min, ...rates })
   }, [staff, form, bounds.min, bounds.max])
 
   async function handleFinish(values) {
     setBusy(true)
-    const payload = { staff: staff.id, month, kind: values.kind, note: (values.note || '').trim(), date: values.date || null }
+    const payload = { staff: staff.id, month, kind: values.kind, note: (values.note || '').trim(), date: measured ? values.date : null }
     const kindValue = (field) => values[`${values.kind}_${field}`]
     if (measured)
       Object.assign(payload, {
@@ -223,7 +223,12 @@ function ExtraModal({ staff, month, onClose, onSaved }) {
                   </Form.Item>
                 </Col>
                 <Col span={12}>
-                  <Form.Item label="Day" name="date" extra={staff.pay.daily_extra ? 'Daily extras: one per day.' : 'Optional.'}>
+                  <Form.Item
+                    label="Day"
+                    name="date"
+                    rules={[{ required: true, message: 'Pick the day this was done' }]}
+                    extra="The day the work was done. One words and one hours extra per day."
+                  >
                     <Input type="date" min={bounds.min} max={bounds.max} />
                   </Form.Item>
                 </Col>
@@ -243,18 +248,15 @@ function ExtraModal({ staff, month, onClose, onSaved }) {
               />
             </>
           ) : (
-            <Row gutter={12}>
-              <Col span={12}>
-                <Form.Item key={kind} label={`${EXTRA_KINDS[kind].label} amount`} name={`${kind}_amount`} rules={[{ required: true, message: 'Enter the amount' }]}>
-                  <InputNumber min={0.01} prefix="NPR" style={{ width: '100%' }} autoFocus />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label="Day" name="date" extra="Optional.">
-                  <Input type="date" min={bounds.min} max={bounds.max} />
-                </Form.Item>
-              </Col>
-            </Row>
+            <Form.Item
+              key={kind}
+              label={`${EXTRA_KINDS[kind].label} amount`}
+              name={`${kind}_amount`}
+              rules={[{ required: true, message: 'Enter the amount' }]}
+              extra={`Paid for the whole month of ${monthLabel(month)}, not a single day.`}
+            >
+              <InputNumber min={0.01} prefix="NPR" style={{ width: '100%' }} autoFocus />
+            </Form.Item>
           )}
           <Form.Item label="Note" name="note" style={{ marginBottom: 0 }}>
             <Input maxLength={255} placeholder={kind === 'words' ? 'Order or assignment reference' : 'Reason'} />

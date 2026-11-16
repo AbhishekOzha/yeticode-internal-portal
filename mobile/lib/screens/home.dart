@@ -28,7 +28,11 @@ class _HomeState extends State<Home> {
     final index = _tab.clamp(0, pages.length - 1);
     return Scaffold(
       appBar: AppBar(
-        title: Text(state.branding['name']?.toString() ?? 'Yeticode'),
+        titleSpacing: 20,
+        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Hi, ${(state.me?['first_name'] ?? state.me?['full_name'] ?? '').toString().split(' ').first} 👋', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+          Text(state.branding['name']?.toString() ?? 'Yeticode', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Theme.of(context).colorScheme.outline)),
+        ]),
         actions: [
           IconButton(
             icon: Badge(isLabelVisible: state.notificationsUnread > 0, label: Text('${state.notificationsUnread}'), child: const Icon(Icons.notifications_outlined)),

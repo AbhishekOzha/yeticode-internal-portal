@@ -259,6 +259,10 @@ class PayExtraSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"date": "The day must fall in the chosen month."})
 
         kind = data["kind"]
+        if kind in PayExtra.MEASURED and not data["date"]:
+            raise serializers.ValidationError({"date": "Pick the day this work was done."})
+        if kind not in PayExtra.MEASURED:
+            data["date"] = None  # performance and effort are for the whole month, not a day
         if kind in PayExtra.MEASURED:
             pay = pay_for(data["staff"])
             if kind == PayExtra.Kind.WORDS:
@@ -290,7 +294,7 @@ class PayExtraSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"amount": "Enter the amount in NPR."})
             data.update(quantity=None, per_quantity=None, per_amount=None)
 
-        attrs.update({key: data[key] for key in ["month", "quantity", "per_quantity", "per_amount", "amount"]})
+        attrs.update({key: data[key] for key in ["month", "date", "quantity", "per_quantity", "per_amount", "amount"]})
         return attrs
 
 

@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
@@ -414,7 +415,9 @@ class _CallPanel extends StatelessWidget {
                 : 'Connecting…';
     return Material(
       color: const Color(0xFF101828),
-      child: SafeArea(
+      child: Container(
+        decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF1E1B4B), Color(0xFF4C1D95), Color(0xFF101828)], begin: Alignment.topCenter, end: Alignment.bottomCenter)),
+        child: SafeArea(
         child: Column(children: [
           if (c.peerSharing)
             Expanded(
@@ -436,7 +439,7 @@ class _CallPanel extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Avatar(peer, radius: c.peerSharing ? 28 : 56),
+              _Pulse(active: !connected, child: Avatar(peer, radius: c.peerSharing ? 28 : 56)),
               const SizedBox(height: 16),
               Text(displayName(peer), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
@@ -460,6 +463,7 @@ class _CallPanel extends StatelessWidget {
           ),
         ]),
       ),
+      ),
     );
   }
 }
@@ -482,5 +486,24 @@ class _Round extends StatelessWidget {
       const SizedBox(height: 8),
       Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
     ]);
+  }
+}
+
+
+/// Soft rings that pulse around the avatar while the call is ringing or connecting.
+class _Pulse extends StatelessWidget {
+  const _Pulse({required this.child, required this.active});
+  final Widget child;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!active) return child;
+    Widget ring(int delay) => Container(
+          width: 150,
+          height: 150,
+          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white38, width: 2)),
+        ).animate(onPlay: (c) => c.repeat(), delay: delay.ms).scale(begin: const Offset(0.7, 0.7), end: const Offset(1.5, 1.5), duration: 1800.ms).fadeOut(duration: 1800.ms);
+    return Stack(alignment: Alignment.center, children: [ring(0), ring(600), ring(1200), child]);
   }
 }

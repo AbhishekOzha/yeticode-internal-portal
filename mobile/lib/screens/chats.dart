@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../api.dart';
 import '../state.dart';
 import '../util.dart';
+import '../widgets/skeleton.dart';
 import '../widgets/api_image.dart';
 import '../widgets/gif_picker.dart';
 import 'chat_screen.dart';
@@ -105,11 +106,17 @@ class _ChatsScreenState extends State<ChatsScreen> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    if (_data == null) return Center(child: _error != null ? Padding(padding: const EdgeInsets.all(24), child: Text(_error!)) : const CircularProgressIndicator());
+    if (_data == null) return _error != null ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!))) : const SkeletonList();
     final team = Map<String, dynamic>.from(_data!['team']);
     final groups = (_data!['groups'] as List).map((e) => Map<String, dynamic>.from(e)).toList();
     final contacts = (_data!['contacts'] as List).map((e) => Map<String, dynamic>.from(e)).toList();
-    Widget badge(int n) => n > 0 ? Badge(label: Text('$n')) : const SizedBox.shrink();
+    Widget badge(int n) => n > 0
+        ? Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+            decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF4F46E5), Color(0xFF9333EA)]), borderRadius: BorderRadius.circular(12)),
+            child: Text('$n', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+          )
+        : const SizedBox.shrink();
     return Scaffold(
       floatingActionButton: FloatingActionButton(onPressed: _newGroup, tooltip: 'New group', child: const Icon(Icons.group_add)),
       body: RefreshIndicator(

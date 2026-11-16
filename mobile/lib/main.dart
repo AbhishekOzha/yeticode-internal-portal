@@ -6,6 +6,7 @@ import 'call.dart';
 import 'screens/home.dart';
 import 'screens/login.dart';
 import 'state.dart';
+import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,16 +28,11 @@ class YeticodeApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    ThemeData theme(Brightness b) => ThemeData(
-          colorSchemeSeed: const Color(0xFF2F54EB),
-          brightness: b,
-          useMaterial3: true,
-        );
     return MaterialApp(
       title: 'Yeticode',
       debugShowCheckedModeBanner: false,
-      theme: theme(Brightness.light),
-      darkTheme: theme(Brightness.dark),
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
       builder: (context, child) => Stack(children: [child!, const CallOverlay()]),
       home: Consumer<AppState>(
         builder: (context, state, _) {

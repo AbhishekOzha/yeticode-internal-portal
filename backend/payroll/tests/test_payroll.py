@@ -1,3 +1,4 @@
+import datetime
 from decimal import Decimal
 
 from django.test import TestCase
@@ -35,6 +36,10 @@ class PayrollTestCase(TestCase):
         self.client.force_authenticate(user)
 
     def add_extra(self, **data):
+        # Words and hours extras belong to a day; give each a different one unless the test names it.
+        if data.get("kind") in ("words", "hours") and "date" not in data:
+            self.day = getattr(self, "day", 0) % 28 + 1
+            data["date"] = f"{data.get('month', '2026-09')}-{self.day:02d}"
         return self.client.post("/api/payroll/extras/", {"staff": self.writer.pk, "month": "2026-09", **data}, format="json")
 
 
@@ -218,7 +223,11 @@ class DailyLogTests(PayrollTestCase):
 
     def test_other_extras_are_left_alone(self):
         self.add_extra(kind="performance", amount="1500")
-        self.add_extra(kind="words", quantity="6000")  # a monthly, undated extra
+        # An older monthly extra with no day, which the daily log must leave alone.
+        PayExtra.objects.create(
+            staff=self.writer, month=datetime.date(2026, 9, 1), kind="words", quantity=Decimal("6000"),
+            per_quantity=Decimal("6000"), per_amount=Decimal("1000"), amount=Decimal("1000"),
+        )
         self.save([{"date": "2026-09-01", "hours": "2"}])
         self.save([])
         self.assertEqual(set(PayExtra.objects.filter(staff=self.writer).values_list("kind", flat=True)), {"performance", "words"})
@@ -434,3 +443,22 @@ class SalaryAndDailyLogNoticeTests(PayrollTestCase):
         note = self.notes("daily_log_updated")[0]
         self.assertIn("September 2026", note.title)
         self.assertIn("2 hours and 3,000 words", note.body)
+
+
+class ExtraDayTests(PayrollTestCase):
+    def setUp(self):
+        super().setUp()
+        self.as_user(self.hr)
+
+    def test_words_and_hours_need_a_day(self):
+        for kind in ("words", "hours"):
+            response = self.client.post(
+                "/api/payroll/extras/", {"staff": self.writer.pk, "month": "2026-09", "kind": kind, "quantity": "2"}, format="json"
+            )
+            self.assertEqual(response.status_code, 400, kind)
+            self.assertIn("date", response.json())
+
+    def test_performance_and_effort_are_monthly_and_drop_any_day(self):
+        response = self.add_extra(kind="effort", amount="500", date="2026-09-05")
+        self.assertEqual(response.status_code, 201)
+        self.assertIsNone(response.json()["date"])

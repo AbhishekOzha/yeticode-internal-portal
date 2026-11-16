@@ -462,11 +462,27 @@ class _ExtraSheet extends StatefulWidget {
 
 class _ExtraSheetState extends State<_ExtraSheet> {
   String _kind = 'words';
+  late DateTime _date = _defaultDay();
   final _value = TextEditingController();
   final _note = TextEditingController();
   bool _busy = false;
 
   bool get _measured => _kind == 'words' || _kind == 'hours';
+
+  List<int> get _monthParts => widget.month.split('-').map(int.parse).toList();
+
+  // Today if it is in this month, otherwise the month's first day.
+  DateTime _defaultDay() {
+    final p = widget.month.split('-').map(int.parse).toList();
+    final now = DateTime.now();
+    return now.year == p[0] && now.month == p[1] ? DateTime(now.year, now.month, now.day) : DateTime(p[0], p[1], 1);
+  }
+
+  Future<void> _pickDay() async {
+    final p = _monthParts;
+    final d = await showDatePicker(context: context, initialDate: _date, firstDate: DateTime(p[0], p[1], 1), lastDate: DateTime(p[0], p[1] + 1, 0));
+    if (d != null) setState(() => _date = d);
+  }
 
   Future<void> _save() async {
     setState(() => _busy = true);
@@ -478,7 +494,8 @@ class _ExtraSheetState extends State<_ExtraSheet> {
         'staff': widget.staffId,
         'month': widget.month,
         'kind': _kind,
-        if (_measured) 'quantity': _value.text.trim() else 'amount': _value.text.trim(),
+        // Words and hours belong to a day; performance and effort are for the whole month.
+        if (_measured) ...{'date': DateFormat('yyyy-MM-dd').format(_date), 'quantity': _value.text.trim()} else 'amount': _value.text.trim(),
         'note': _note.text.trim(),
       });
       if (mounted) Navigator.pop(context, true);
@@ -509,6 +526,14 @@ class _ExtraSheetState extends State<_ExtraSheet> {
             onSelectionChanged: (v) => setState(() => _kind = v.first),
           ),
           const SizedBox(height: 12),
+          if (_measured) ...[
+            OutlinedButton.icon(onPressed: _pickDay, icon: const Icon(Icons.calendar_today, size: 18), label: Text('Day: ${DateFormat('EEE, d MMM yyyy').format(_date)}')),
+            const SizedBox(height: 12),
+          ] else
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text('Paid for the whole month of ${monthLabel(widget.month)}, not a single day.', style: Theme.of(context).textTheme.bodySmall),
+            ),
           TextField(
             controller: _value,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),

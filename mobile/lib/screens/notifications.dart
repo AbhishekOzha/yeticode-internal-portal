@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../api.dart';
 import '../state.dart';
 import '../util.dart';
+import '../widgets/skeleton.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -44,7 +45,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Notifications'), actions: [TextButton(onPressed: _readAll, child: const Text('Mark all read'))]),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const SkeletonList()
           : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(physics: const AlwaysScrollableScrollPhysics(), children: [

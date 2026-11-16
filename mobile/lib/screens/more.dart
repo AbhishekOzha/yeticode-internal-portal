@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 
 import '../api.dart';
 import '../state.dart';
+import '../theme.dart';
 import '../util.dart';
 import '../widgets/api_image.dart';
 import '../payroll.dart';
@@ -27,7 +29,8 @@ class MoreScreen extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: const LinearGradient(colors: [Color(0xFF2F54EB), Color(0xFF7B1FA2)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: softShadow(const Color(0xFF4F46E5)),
         ),
         child: Row(children: [
           Avatar(person, radius: 32),
@@ -41,7 +44,7 @@ class MoreScreen extends StatelessWidget {
             ]),
           ),
         ]),
-      ),
+      ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
       if (state.inTeam) ListTile(leading: const CircleAvatar(backgroundColor: Color(0x1FF57C00), child: Icon(Icons.event_busy_outlined, color: Color(0xFFF57C00))), title: const Text('Leave'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LeaveScreen()))),
       if (canManagePayroll(me))
         ListTile(
@@ -53,7 +56,7 @@ class MoreScreen extends StatelessWidget {
         ),
       ListTile(leading: const Icon(Icons.dns_outlined), title: const Text('Server'), subtitle: Text(api.baseUrl)),
       ListTile(
-        leading: const Icon(Icons.logout),
+        leading: const Icon(Icons.logout, color: Colors.red),
         title: const Text('Sign out'),
         onTap: () async {
           await state.signOut();

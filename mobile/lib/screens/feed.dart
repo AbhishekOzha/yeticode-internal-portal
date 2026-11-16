@@ -8,7 +8,10 @@ import 'package:provider/provider.dart';
 
 import '../api.dart';
 import '../state.dart';
+import '../theme.dart';
 import '../util.dart';
+import '../widgets/skeleton.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../widgets/api_image.dart';
 import 'story_viewer.dart';
 
@@ -139,7 +142,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
       body: RefreshIndicator(
         onRefresh: _load,
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const SkeletonList(count: 4)
             : ListView.builder(
                 controller: _scroll,
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -157,7 +160,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                     post: _posts[i - 2],
                     meId: me['id'].toString(),
                     onDeleted: () => setState(() => _posts.removeAt(i - 2)),
-                  );
+                  ).animate().fadeIn(duration: 350.ms, delay: (40 * (i - 2).clamp(0, 6)).ms).slideY(begin: 0.06, curve: Curves.easeOut);
                 },
               ),
       ),
@@ -214,8 +217,15 @@ class _StoryBubble extends StatelessWidget {
             Stack(clipBehavior: Clip.none, children: [
               Container(
                 padding: const EdgeInsets.all(2.5),
-                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: ring ?? Colors.transparent, width: 2.5)),
-                child: Avatar(person, radius: 24),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: ring == null ? null : (ring == Colors.grey ? const LinearGradient(colors: [Color(0xFFCBD5E1), Color(0xFFCBD5E1)]) : storyGradient),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: Theme.of(context).scaffoldBackgroundColor),
+                  child: Avatar(person, radius: 24),
+                ),
               ),
               if (plus)
                 Positioned(
@@ -310,7 +320,7 @@ class _PostCardState extends State<PostCard> {
         Row(children: [
           TextButton.icon(
             onPressed: _like,
-            icon: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : null),
+            icon: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : null).animate(key: ValueKey(liked)).scale(begin: const Offset(0.6, 0.6), end: const Offset(1, 1), duration: 280.ms, curve: Curves.elasticOut),
             label: Text('${post['like_count']}'),
           ),
           TextButton.icon(onPressed: _comments, icon: const Icon(Icons.mode_comment_outlined), label: Text('${post['comment_count']}')),
